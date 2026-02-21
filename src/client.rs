@@ -1,6 +1,7 @@
 use crate::protocol::Direction;
 use crate::protocol::*;
 use crate::shared::LOCAL_ADDR;
+use crate::shared::PlayerSpriteSheetResource;
 use crate::shared::SERVER_ADDR;
 use crate::shared::SHARED_SETTINGS;
 use crate::shared::shared_movement_behaviour;
@@ -36,6 +37,7 @@ impl Plugin for GameClientPlugin {
         app.add_systems(FixedUpdate, player_movement);
         // app.add_systems(Update, debug_sync);
         app.add_observer(handle_predicted_spawn);
+        app.add_observer(handle_interpolated_spawn);
     }
 }
 
@@ -126,13 +128,46 @@ pub fn buffer_input(
     }
 }
 
-fn handle_predicted_spawn(trigger: On<Add, Predicted>, mut commands: Commands) {
+fn handle_predicted_spawn(
+    trigger: On<Add, Predicted>,
+    mut commands: Commands,
+    player_resources: Res<PlayerSpriteSheetResource>,
+) {
     let entity = trigger.entity;
     info!("Adding InputMarker to entity {:?}", entity);
 
-    commands
-        .entity(entity)
-        .insert(InputMarker::<Inputs>::default());
+    commands.entity(entity).insert((
+        InputMarker::<Inputs>::default(),
+        Sprite::from_atlas_image(
+            player_resources.player_image.clone(),
+            TextureAtlas {
+                layout: player_resources.atlas.clone(),
+                index: 0,
+            },
+        ),
+        Transform::from_scale(Vec3::splat(6.0)),
+    ));
+}
+
+fn handle_interpolated_spawn(
+    trigger: On<Add, Interpolated>,
+    mut commands: Commands,
+    player_resources: Res<PlayerSpriteSheetResource>,
+) {
+    let entity = trigger.entity;
+    // info!("Adding InputMarker to entity {:?}", entity);
+
+    commands.entity(entity).insert((
+        // InputMarker::<Inputs>::default(),
+        Sprite::from_atlas_image(
+            player_resources.player_image.clone(),
+            TextureAtlas {
+                layout: player_resources.atlas.clone(),
+                index: 0,
+            },
+        ),
+        Transform::from_scale(Vec3::splat(6.0)),
+    ));
 }
 
 fn player_movement(

@@ -14,6 +14,8 @@ impl Plugin for ProtocolPlugin {
         app.register_component::<PlayerPosition>()
             .add_prediction()
             .add_linear_interpolation();
+        app.register_component::<MovementDirection>();
+        app.register_component::<PlayerState>();
     }
 }
 
@@ -25,7 +27,9 @@ impl Ease for PlayerPosition {
     }
 }
 
-#[derive(Debug, Component, Serialize, Deserialize, Clone, PartialEq, Reflect, Deref, DerefMut)]
+#[derive(
+    Debug, Component, Serialize, Deserialize, Clone, PartialEq, Reflect, Deref, DerefMut, Default,
+)]
 pub struct PlayerPosition(pub Vec2);
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Clone, Reflect)]
@@ -34,12 +38,6 @@ pub struct Direction {
     pub(crate) down: bool,
     pub(crate) left: bool,
     pub(crate) right: bool,
-}
-
-impl Direction {
-    pub(crate) fn is_none(&self) -> bool {
-        !self.up && !self.down && !self.left && !self.right
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Reflect)]
@@ -56,3 +54,77 @@ impl Default for Inputs {
 impl MapEntities for Inputs {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {}
 }
+
+#[derive(Debug, Component, Serialize, Deserialize, Clone, PartialEq, Reflect, Default)]
+pub enum MovementDirection {
+    Back,
+    Left,
+    Right,
+    #[default]
+    Front,
+}
+
+#[derive(Debug, Component, Serialize, Deserialize, Clone, PartialEq, Reflect, Default)]
+pub enum PlayerState {
+    #[default]
+    Idle,
+    Walking,
+}
+
+// #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
+// pub struct AnimationConfig {
+//     first_sprite_index: usize,
+//     last_sprite_index: usize,
+// }
+
+// #[derive(Debug, Component, Serialize, Deserialize, Clone, PartialEq, Reflect)]
+// pub struct PlayerAnimations {
+//     current_animation: AnimationConfig,
+
+//     idle_front: AnimationConfig,
+//     idle_back: AnimationConfig,
+//     idle_left: AnimationConfig,
+//     idle_right: AnimationConfig,
+
+//     move_front: AnimationConfig,
+//     move_back: AnimationConfig,
+//     move_left: AnimationConfig,
+//     move_right: AnimationConfig,
+
+//     fps: u8,
+//     // frame_timer: Timer,
+// }
+
+// impl PlayerAnimations {
+//     pub fn new(
+//         idle_front: AnimationConfig,
+//         idle_back: AnimationConfig,
+//         idle_left: AnimationConfig,
+//         idle_right: AnimationConfig,
+
+//         move_front: AnimationConfig,
+//         move_back: AnimationConfig,
+//         move_left: AnimationConfig,
+//         move_right: AnimationConfig,
+
+//         fps: u8,
+//     ) -> Self {
+//         let character_animation_config = PlayerAnimations {
+//             current_animation: idle_front,
+//             idle_front,
+//             idle_back,
+//             idle_left,
+//             idle_right,
+//             move_front,
+//             move_back,
+//             move_left,
+//             move_right,
+//             fps: fps,
+//             // frame_timer: Timer::new(
+//             //     Duration::from_secs_f32(1.0 / (fps as f32)),
+//             //     TimerMode::Repeating,
+//             // ),
+//         };
+//         character_animation_config
+//     }
+// }

@@ -33,7 +33,14 @@ pub struct SharedPlugin;
 impl Plugin for SharedPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(ProtocolPlugin);
+        app.add_systems(Startup, load_resources);
     }
+}
+
+#[derive(Debug, Resource, Clone, PartialEq, Reflect)]
+pub struct PlayerSpriteSheetResource {
+    pub player_image: Handle<Image>,
+    pub atlas: Handle<TextureAtlasLayout>,
 }
 
 // This system defines how we update the player's positions when we receive an input
@@ -52,4 +59,55 @@ pub fn shared_movement_behaviour(mut position: Mut<PlayerPosition>, input: &Inpu
     if direction.right {
         position.x += MOVE_SPEED;
     }
+}
+
+pub fn load_resources(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+) {
+    let character_texture = asset_server.load("sprout/Characters/basic_movement.png");
+    let sprite_sheet_layout = TextureAtlasLayout::from_grid(UVec2::new(48, 48), 4, 4, None, None);
+    let texture_atlas_layout = texture_atlas_layouts.add(sprite_sheet_layout);
+
+    commands.insert_resource(PlayerSpriteSheetResource {
+        player_image: character_texture,
+        atlas: texture_atlas_layout,
+    });
+
+    // let character_animation_config = CharacterAnimations::new(
+    //     AnimationConfig {
+    //         first_sprite_index: 0,
+    //         last_sprite_index: 1,
+    //     },
+    //     AnimationConfig {
+    //         first_sprite_index: 4,
+    //         last_sprite_index: 5,
+    //     },
+    //     AnimationConfig {
+    //         first_sprite_index: 8,
+    //         last_sprite_index: 9,
+    //     },
+    //     AnimationConfig {
+    //         first_sprite_index: 12,
+    //         last_sprite_index: 13,
+    //     },
+    //     AnimationConfig {
+    //         first_sprite_index: 2,
+    //         last_sprite_index: 3,
+    //     },
+    //     AnimationConfig {
+    //         first_sprite_index: 6,
+    //         last_sprite_index: 7,
+    //     },
+    //     AnimationConfig {
+    //         first_sprite_index: 10,
+    //         last_sprite_index: 11,
+    //     },
+    //     AnimationConfig {
+    //         first_sprite_index: 14,
+    //         last_sprite_index: 15,
+    //     },
+    //     2, //fps
+    // );
 }

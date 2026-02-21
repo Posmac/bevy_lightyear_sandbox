@@ -152,78 +152,6 @@ fn main() {
     //     .run();
 }
 
-// #[derive(Copy, Clone, Debug)]
-// struct AnimationConfig {
-//     first_sprite_index: usize,
-//     last_sprite_index: usize,
-// }
-
-// #[derive(Debug, Component, Clone, Copy, PartialEq)]
-// enum MovementDirection {
-//     Back,
-//     Left,
-//     Right,
-//     Front,
-// }
-
-// impl Default for MovementDirection {
-//     fn default() -> Self {
-//         MovementDirection::Front
-//     }
-// }
-
-// #[derive(Component)]
-// struct CharacterAnimations {
-//     current_animation: AnimationConfig,
-
-//     idle_front: AnimationConfig,
-//     idle_back: AnimationConfig,
-//     idle_left: AnimationConfig,
-//     idle_right: AnimationConfig,
-
-//     move_front: AnimationConfig,
-//     move_back: AnimationConfig,
-//     move_left: AnimationConfig,
-//     move_right: AnimationConfig,
-
-//     fps: u8,
-//     frame_timer: Timer,
-// }
-
-// impl CharacterAnimations {
-//     fn new(
-//         idle_front: AnimationConfig,
-//         idle_back: AnimationConfig,
-//         idle_left: AnimationConfig,
-//         idle_right: AnimationConfig,
-
-//         move_front: AnimationConfig,
-//         move_back: AnimationConfig,
-//         move_left: AnimationConfig,
-//         move_right: AnimationConfig,
-
-//         fps: u8,
-//     ) -> Self {
-//         let character_animation_config = CharacterAnimations {
-//             current_animation: idle_front,
-//             idle_front,
-//             idle_back,
-//             idle_left,
-//             idle_right,
-//             move_front,
-//             move_back,
-//             move_left,
-//             move_right,
-//             fps: fps,
-//             frame_timer: Timer::new(
-//                 Duration::from_secs_f32(1.0 / (fps as f32)),
-//                 TimerMode::Repeating,
-//             ),
-//         };
-//         character_animation_config
-//     }
-// }
-
 // #[derive(Debug, Component, Clone, Copy, PartialEq, Default)]
 // struct AccumulatedInput {
 //     // The player's movement input (WASD).
@@ -242,65 +170,6 @@ fn main() {
 
 // fn setup_camera(mut commands: Commands) {
 //     commands.spawn(Camera2d);
-// }
-
-// fn setup_character(
-//     mut commands: Commands,
-//     asset_server: Res<AssetServer>,
-//     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
-// ) {
-//     let character_texture = asset_server.load("sprout/Characters/basic_movement.png");
-//     let sprite_sheet_layout = TextureAtlasLayout::from_grid(UVec2::new(48, 48), 4, 4, None, None);
-//     let texture_atlas_layout = texture_atlas_layouts.add(sprite_sheet_layout);
-
-//     let character_animation_config = CharacterAnimations::new(
-//         AnimationConfig {
-//             first_sprite_index: 0,
-//             last_sprite_index: 1,
-//         },
-//         AnimationConfig {
-//             first_sprite_index: 4,
-//             last_sprite_index: 5,
-//         },
-//         AnimationConfig {
-//             first_sprite_index: 8,
-//             last_sprite_index: 9,
-//         },
-//         AnimationConfig {
-//             first_sprite_index: 12,
-//             last_sprite_index: 13,
-//         },
-//         AnimationConfig {
-//             first_sprite_index: 2,
-//             last_sprite_index: 3,
-//         },
-//         AnimationConfig {
-//             first_sprite_index: 6,
-//             last_sprite_index: 7,
-//         },
-//         AnimationConfig {
-//             first_sprite_index: 10,
-//             last_sprite_index: 11,
-//         },
-//         AnimationConfig {
-//             first_sprite_index: 14,
-//             last_sprite_index: 15,
-//         },
-//         2, //fps
-//     );
-
-//     commands.spawn((
-//         Sprite::from_atlas_image(
-//             character_texture,
-//             TextureAtlas {
-//                 layout: texture_atlas_layout,
-//                 index: 0,
-//             },
-//         ),
-//         Transform::from_scale(Vec3::splat(6.0)),
-//         character_animation_config,
-//         AccumulatedInput::default(),
-//     ));
 // }
 
 // fn process_character_animation(
@@ -393,23 +262,6 @@ fn main() {
 //     }
 
 //     input.is_new_direction = input.prev_movement_direction != input.movement_direction;
-// }
-
-// fn move_character(player: Single<(&AccumulatedInput, &mut Transform)>, time: Res<Time>) {
-//     /// Since Bevy's 3D renderer assumes SI units, this has the unit of meters per second.
-//     /// Note that about 1.5 is the average walking speed of a human.
-//     const SPEED: f32 = 400.0;
-//     let (input, mut transform) = player.into_inner();
-
-//     let velocity = Vec3 {
-//         x: input.movement.x,
-//         y: input.movement.y,
-//         z: 0.0,
-//     }
-//     .normalize_or_zero()
-//         * SPEED
-//         * time.delta_secs();
-//     transform.translation += velocity;
 // }
 
 // fn clear_input(player_input: Single<&mut AccumulatedInput>) {

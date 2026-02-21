@@ -13,8 +13,11 @@ use lightyear::{
 };
 
 use crate::{
-    protocol::{Inputs, PlayerPosition},
-    shared::{SEND_INTERVAL, SERVER_ADDR, SHARED_SETTINGS, shared_movement_behaviour},
+    protocol::{Inputs, MovementDirection, PlayerPosition, PlayerState},
+    shared::{
+        PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_ADDR, SHARED_SETTINGS,
+        shared_movement_behaviour,
+    },
 };
 
 pub struct GameServerPlugin;
@@ -23,8 +26,8 @@ impl Plugin for GameServerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, startup);
         app.add_systems(FixedUpdate, movement);
-        app.add_observer(on_link);
-        app.add_observer(on_connected);
+        app.add_observer(on_player_link);
+        app.add_observer(on_player_connected);
 
         // app.add_systems(Update, debug_server_replicate);
     }
@@ -36,7 +39,7 @@ impl Plugin for GameServerPlugin {
 //     }
 // }
 
-fn on_link(trigger: On<Add, LinkOf>, mut commands: Commands) {
+fn on_player_link(trigger: On<Add, LinkOf>, mut commands: Commands) {
     info!(
         "Incoming UDP packet → spawned LinkOf entity: {:?}",
         trigger.entity
@@ -47,10 +50,11 @@ fn on_link(trigger: On<Add, LinkOf>, mut commands: Commands) {
     ));
 }
 
-fn on_connected(
+fn on_player_connected(
     trigger: On<Add, Connected>,
     query: Query<&RemoteId, With<ClientOf>>,
     mut commands: Commands,
+    player_resources: Res<PlayerSpriteSheetResource>,
 ) {
     info!(
         "Handshake complete → client fully connected: {:?}",
@@ -65,7 +69,9 @@ fn on_connected(
 
     let entity = commands
         .spawn((
-            PlayerPosition(Vec2::ZERO),
+            PlayerPosition::default(),
+            PlayerState::default(),
+            MovementDirection::default(),
             Replicate::to_clients(NetworkTarget::All),
             PredictionTarget::to_clients(NetworkTarget::Single(client_id)),
             InterpolationTarget::to_clients(NetworkTarget::AllExceptSingle(client_id)),
@@ -73,7 +79,15 @@ fn on_connected(
                 owner: trigger.entity,
                 lifetime: Default::default(),
             },
-            // ActionState::<Inputs>::default(),
+            Sprite::from_atlas_image(
+                player_resources.player_image.clone(),
+                TextureAtlas {
+                    layout: player_resources.atlas.clone(),
+                    index: 0,
+                },
+            ),
+            Transform::from_scale(Vec3::splat(6.0)),
+            // character_animation_config,
         ))
         .id();
 
