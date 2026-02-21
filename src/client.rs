@@ -4,26 +4,29 @@ use crate::shared::LOCAL_ADDR;
 use crate::shared::SERVER_ADDR;
 use crate::shared::SHARED_SETTINGS;
 use crate::shared::shared_movement_behaviour;
+use aeronet_websocket::client::ClientConfig;
 use bevy::prelude::*;
 use lightyear::netcode::NetcodeClient;
 use lightyear::prelude::client::NetcodeConfig;
+use lightyear::prelude::client::WebSocketClientIo;
 use lightyear::prelude::client::input::*;
 use lightyear::prelude::input::native::*;
 use lightyear::prelude::*;
+use lightyear::websocket::client::WebSocketTarget;
 
 pub struct GameClientPlugin {
     pub client_id: u64,
 }
 
 #[derive(Resource)]
-pub struct ClientConfig {
+pub struct ClientId {
     pub client_id: u64,
 }
 
 impl Plugin for GameClientPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, startup);
-        app.insert_resource(ClientConfig {
+        app.insert_resource(ClientId {
             client_id: self.client_id,
         });
         app.add_systems(
@@ -55,19 +58,34 @@ impl Plugin for GameClientPlugin {
 //     }
 // }
 
-pub fn startup(mut commands: Commands, config: Res<ClientConfig>) {
+pub fn startup(mut commands: Commands, config: Res<ClientId>) {
     let auth = Authentication::Manual {
         client_id: config.client_id,
         server_addr: SERVER_ADDR,
         protocol_id: SHARED_SETTINGS.protocol_id,
         private_key: SHARED_SETTINGS.private_key,
     };
+    let config = {
+        #[cfg(target_family = "wasm")]
+        {
+            ClientConfig::default()
+        }
+        #[cfg(not(target_family = "wasm"))]
+        {
+            ClientConfig::builder().with_no_cert_validation()
+        }
+    };
 
+    // ClientConfig::builder().with_no_cert_validation(),
     let client = commands
         .spawn((
             Client::default(),
             NetcodeClient::new(auth, NetcodeConfig::default()).unwrap(),
-            UdpIo::default(),
+            // UdpIo::default(),
+            WebSocketClientIo {
+                config,
+                target: WebSocketTarget::Addr(Default::default()),
+            },
             LocalAddr(LOCAL_ADDR), // обязательно
             PeerAddr(SERVER_ADDR), // сервер
             ReplicationReceiver::default(),

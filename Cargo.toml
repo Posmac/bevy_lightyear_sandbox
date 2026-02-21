@@ -7,7 +7,8 @@ edition = "2024"
 bevy = { version = "0.18", default-features = true, features = ["2d"] }
 bevy-inspector-egui = "0.36.0"
 lightyear ={ version = "0.26.4", features = [
-  "client", "server", "netcode", "udp", "interpolation", "prediction", "replication", "input_native"
+  "client", "server", "netcode", "udp", "interpolation", "prediction", "replication", "input_native", "websocket"
 ] }
+aeronet_websocket = { version = "0.19.1" }
 serde = "1.0.228"
 clap = { version = "4.5.59", features = ["derive"] }

@@ -97,9 +97,9 @@ dependencies = [
 
 [[package]]
 name = "aeronet_io"
-version = "0.19.0"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f05b43f128690e5eb9636b8a227078b2a4e577450da145d26ea1cd14688d80bc"
+checksum = "02d50ca460ea143f90a3c1ecf36709b9cbb49752d5ddfbf2d67623b465fbfb81"
 dependencies = [
  "anyhow",
  "bevy_app",
@@ -133,9 +133,9 @@ dependencies = [
 
 [[package]]
 name = "aeronet_websocket"
-version = "0.19.0"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8607d83e8128d2b0bab842e3201da8ce3ce3a3ebc4f62a9fc67d55ca6bc929b3"
+checksum = "ab40ded6412a153f6e189620251f44cb74dc43a218eddea9f4fe4ba55a72e763"
 dependencies = [
  "aeronet_io",
  "bevy_app",
@@ -6464,6 +6464,7 @@ dependencies = [
 name = "sandbox"
 version = "0.1.0"
 dependencies = [
+ "aeronet_websocket",
  "bevy",
  "bevy-inspector-egui",
  "clap",

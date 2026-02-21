@@ -1,3 +1,6 @@
+use std::net::{Ipv4Addr, SocketAddr};
+
+use aeronet_websocket::server::ServerConfig;
 use bevy::prelude::*;
 use lightyear::{
     netcode::{NetcodeServer, prelude::server},
@@ -5,7 +8,7 @@ use lightyear::{
         Connected, ControlledBy, InterpolationTarget, LinkOf, LocalAddr, LocalTimeline,
         NetworkTarget, PredictionTarget, RemoteId, Replicate, ReplicationSender, SendUpdatesMode,
         input::native::ActionState,
-        server::{ClientOf, ServerUdpIo, Start},
+        server::{ClientOf, ServerUdpIo, Start, WebSocketServerIo},
     },
 };
 
@@ -82,6 +85,16 @@ fn on_connected(
 
 pub fn startup(mut commands: Commands) {
     info!("Server created");
+
+    let sans = vec![
+        "localhost".to_string(),
+        "127.0.0.1".to_string(),
+        "::1".to_string(),
+    ];
+    let config = ServerConfig::builder()
+        .with_bind_address(SERVER_ADDR)
+        .with_identity(lightyear::websocket::server::Identity::self_signed(sans).unwrap());
+
     let server = commands
         .spawn((
             NetcodeServer::new(server::NetcodeConfig {
@@ -90,7 +103,8 @@ pub fn startup(mut commands: Commands) {
                 ..Default::default()
             }),
             LocalAddr(SERVER_ADDR),
-            ServerUdpIo::default(),
+            // ServerUdpIo::default(),
+            WebSocketServerIo { config },
         ))
         .id();
     commands.trigger(Start { entity: server });
