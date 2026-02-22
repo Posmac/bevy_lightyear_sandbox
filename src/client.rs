@@ -1,9 +1,12 @@
 use crate::protocol::Direction;
 use crate::protocol::*;
 use crate::shared::LOCAL_ADDR;
+use crate::shared::PlayerAnimationTimer;
 use crate::shared::PlayerSpriteSheetResource;
 use crate::shared::SERVER_ADDR;
 use crate::shared::SHARED_SETTINGS;
+use crate::shared::get_player_anim_config;
+use crate::shared::shared_animation_behaviour;
 use crate::shared::shared_movement_behaviour;
 use aeronet_websocket::client::ClientConfig;
 use bevy::prelude::*;
@@ -34,7 +37,8 @@ impl Plugin for GameClientPlugin {
             FixedPreUpdate,
             buffer_input.in_set(InputSystems::WriteClientInputs),
         );
-        app.add_systems(FixedUpdate, player_movement);
+        app.add_systems(FixedUpdate, local_player_movement);
+        app.add_systems(FixedUpdate, local_player_animation);
         // app.add_systems(Update, debug_sync);
         app.add_observer(handle_predicted_spawn);
         app.add_observer(handle_interpolated_spawn);
@@ -105,16 +109,17 @@ pub fn buffer_input(
 ) {
     if let Ok(mut action_state) = query.single_mut() {
         let mut direction = Direction {
-            up: false,
-            down: false,
+            front: false,
+            back: false,
             left: false,
             right: false,
         };
+
         if keypress.pressed(KeyCode::KeyW) || keypress.pressed(KeyCode::ArrowUp) {
-            direction.up = true;
+            direction.back = true;
         }
         if keypress.pressed(KeyCode::KeyS) || keypress.pressed(KeyCode::ArrowDown) {
-            direction.down = true;
+            direction.front = true;
         }
         if keypress.pressed(KeyCode::KeyA) || keypress.pressed(KeyCode::ArrowLeft) {
             direction.left = true;
@@ -146,6 +151,7 @@ fn handle_predicted_spawn(
             },
         ),
         Transform::from_scale(Vec3::splat(6.0)),
+        PlayerAnimationTimer::new(2),
     ));
 }
 
@@ -167,12 +173,13 @@ fn handle_interpolated_spawn(
             },
         ),
         Transform::from_scale(Vec3::splat(6.0)),
+        PlayerAnimationTimer::new(2),
     ));
 }
 
-fn player_movement(
+fn local_player_movement(
     // timeline: Single<&LocalTimeline>,
-    mut position_query: Query<(&mut PlayerPosition, &ActionState<Inputs>)>,
+    mut position_query: Query<(&mut PlayerPosition, &ActionState<Inputs>), With<Predicted>>,
 ) {
     // let tick = timeline.tick();
     for (position, input) in position_query.iter_mut() {
@@ -180,5 +187,23 @@ fn player_movement(
         // NOTE: be careful to directly pass Mut<PlayerPosition>
         // getting a mutable reference triggers change detection, unless you use `as_deref_mut()`
         shared_movement_behaviour(position, input);
+    }
+}
+
+fn local_player_animation(
+    // timeline: Res<LocalTimeline>,
+    mut player_query: Query<
+        (
+            &mut PlayerState,
+            // &mut PlayerAnimations,
+            &ActionState<Inputs>,
+        ),
+        With<Predicted>,
+    >,
+) {
+    // let tick = timeline.tick();
+    for (state, inputs) in player_query.iter_mut() {
+        // trace!(?tick, ?state, ?anims, ?inputs, "server");
+        shared_animation_behaviour(state, inputs);
     }
 }

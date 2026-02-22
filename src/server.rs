@@ -1,5 +1,3 @@
-use std::net::{Ipv4Addr, SocketAddr};
-
 use aeronet_websocket::server::ServerConfig;
 use bevy::prelude::*;
 use lightyear::{
@@ -8,14 +6,15 @@ use lightyear::{
         Connected, ControlledBy, InterpolationTarget, LinkOf, LocalAddr, LocalTimeline,
         NetworkTarget, PredictionTarget, RemoteId, Replicate, ReplicationSender, SendUpdatesMode,
         input::native::ActionState,
-        server::{ClientOf, ServerUdpIo, Start, WebSocketServerIo},
+        server::{ClientOf, Start, WebSocketServerIo},
     },
 };
 
 use crate::{
-    protocol::{Inputs, MovementDirection, PlayerPosition, PlayerState},
+    protocol::{Inputs, PlayerPosition, PlayerState, PlayerStateEnum},
     shared::{
-        PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_ADDR, SHARED_SETTINGS,
+        PlayerAnimationTimer, PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_ADDR,
+        SHARED_SETTINGS, get_player_anim_config, shared_animation_behaviour,
         shared_movement_behaviour,
     },
 };
@@ -25,7 +24,7 @@ pub struct GameServerPlugin;
 impl Plugin for GameServerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, startup);
-        app.add_systems(FixedUpdate, movement);
+        app.add_systems(FixedUpdate, (movement, animation));
         app.add_observer(on_player_link);
         app.add_observer(on_player_connected);
 
@@ -71,7 +70,6 @@ fn on_player_connected(
         .spawn((
             PlayerPosition::default(),
             PlayerState::default(),
-            MovementDirection::default(),
             Replicate::to_clients(NetworkTarget::All),
             PredictionTarget::to_clients(NetworkTarget::Single(client_id)),
             InterpolationTarget::to_clients(NetworkTarget::AllExceptSingle(client_id)),
@@ -87,7 +85,8 @@ fn on_player_connected(
                 },
             ),
             Transform::from_scale(Vec3::splat(6.0)),
-            // character_animation_config,
+            get_player_anim_config(),
+            PlayerAnimationTimer::new(2),
         ))
         .id();
 
@@ -133,5 +132,20 @@ fn movement(
     for (position, inputs) in position_query.iter_mut() {
         trace!(?tick, ?position, ?inputs, "server");
         shared_movement_behaviour(position, inputs);
+    }
+}
+
+fn animation(
+    timeline: Res<LocalTimeline>,
+    mut player_query: Query<(
+        &mut PlayerState,
+        // &mut PlayerAnimations,
+        &ActionState<Inputs>,
+    )>,
+) {
+    let tick = timeline.tick();
+    for (state, inputs) in player_query.iter_mut() {
+        trace!(?tick, ?state, ?inputs, "server");
+        shared_animation_behaviour(state, inputs);
     }
 }
