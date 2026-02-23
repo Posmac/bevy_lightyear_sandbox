@@ -5,9 +5,9 @@ use crate::shared::PlayerAnimationTimer;
 use crate::shared::PlayerSpriteSheetResource;
 use crate::shared::SERVER_ADDR;
 use crate::shared::SHARED_SETTINGS;
-use crate::shared::get_player_anim_config;
 use crate::shared::shared_animation_behaviour;
 use crate::shared::shared_movement_behaviour;
+use crate::shared::shared_world_generator;
 use aeronet_websocket::client::ClientConfig;
 use bevy::prelude::*;
 use lightyear::netcode::NetcodeClient;
@@ -40,8 +40,10 @@ impl Plugin for GameClientPlugin {
         app.add_systems(FixedUpdate, local_player_movement);
         app.add_systems(FixedUpdate, local_player_animation);
         // app.add_systems(Update, debug_sync);
+        app.add_systems(Update, camera_follow);
         app.add_observer(handle_predicted_spawn);
         app.add_observer(handle_interpolated_spawn);
+        app.add_observer(handle_world_config_spawn);
     }
 }
 
@@ -63,6 +65,16 @@ impl Plugin for GameClientPlugin {
 //         );
 //     }
 // }
+//
+fn camera_follow(
+    player_query: Single<&PlayerPosition, With<Predicted>>,
+    camera_query: Single<&mut Transform, With<Camera2d>>,
+) {
+    // let player_pos = player_query.into_inner();
+    // let mut camera_transform = camera_query.into_inner();
+    // let target = Vec3::new(player_pos.0.x, player_pos.0.y, 0.0);
+    // camera_transform.translation = camera_transform.translation.lerp(target, 0.1);
+}
 
 pub fn startup(mut commands: Commands, config: Res<ClientId>) {
     let auth = Authentication::Manual {
@@ -153,6 +165,24 @@ fn handle_predicted_spawn(
         Transform::from_scale(Vec3::splat(6.0)),
         PlayerAnimationTimer::new(2),
     ));
+}
+
+fn handle_world_config_spawn(
+    trigger: On<Add, WorldConfig>,
+    mut commands: Commands,
+    world_config: Single<&WorldConfig>,
+    asset_server: Res<AssetServer>,
+    // #[cfg(all(not(feature = "atlas"), feature = "render"))] array_texture_loader: Res<
+    //     ArrayTextureLoader,
+    // >,
+) {
+    info!("World config generator started");
+    shared_world_generator(
+        world_config.seed,
+        world_config.world_size,
+        commands,
+        asset_server,
+    );
 }
 
 fn handle_interpolated_spawn(

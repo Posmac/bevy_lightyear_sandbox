@@ -2,7 +2,6 @@ use bevy::ecs::entity::{EntityMapper, MapEntities};
 use bevy::math::Curve;
 use bevy::math::curve::{Ease, FunctionCurve, Interval};
 use bevy::prelude::{Deref, DerefMut};
-use bevy::time::Timer;
 use bevy::{app::Plugin, ecs::component::Component, math::Vec2, reflect::Reflect};
 use lightyear::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -18,6 +17,7 @@ impl Plugin for ProtocolPlugin {
         // app.register_component::<MovementDirection>();
         app.register_component::<PlayerState>();
         app.register_component::<PlayerAnimations>();
+        app.register_component::<WorldConfig>();
     }
 }
 
@@ -173,4 +173,11 @@ impl PlayerAnimations {
             PlayerStateEnum::WalkingRight => self.move_right,
         }
     }
+}
+
+//world generator
+#[derive(Debug, Component, Serialize, Deserialize, Clone, PartialEq, Reflect, Default)]
+pub struct WorldConfig {
+    pub seed: u64,
+    pub world_size: u64,
 }

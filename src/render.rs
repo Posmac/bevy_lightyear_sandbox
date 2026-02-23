@@ -1,11 +1,13 @@
 use crate::{protocol::*, shared::PlayerAnimationTimer};
 use bevy::prelude::*;
+use bevy_ecs_tilemap::prelude::TilemapPlugin;
 
 #[derive(Clone)]
 pub struct GameRendererPlugin;
 
 impl Plugin for GameRendererPlugin {
     fn build(&self, app: &mut App) {
+        app.add_plugins(TilemapPlugin);
         app.add_systems(Startup, init);
         app.add_systems(Update, draw);
         app.add_systems(Update, play_animation);

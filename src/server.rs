@@ -11,11 +11,11 @@ use lightyear::{
 };
 
 use crate::{
-    protocol::{Inputs, PlayerPosition, PlayerState, PlayerStateEnum},
+    protocol::{Inputs, PlayerPosition, PlayerState, WorldConfig},
     shared::{
         PlayerAnimationTimer, PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_ADDR,
         SHARED_SETTINGS, get_player_anim_config, shared_animation_behaviour,
-        shared_movement_behaviour,
+        shared_movement_behaviour, shared_world_generator,
     },
 };
 
@@ -23,10 +23,11 @@ pub struct GameServerPlugin;
 
 impl Plugin for GameServerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, startup);
+        app.add_systems(Startup, (startup, generate_seed).chain());
         app.add_systems(FixedUpdate, (movement, animation));
         app.add_observer(on_player_link);
         app.add_observer(on_player_connected);
+        app.add_observer(on_seed_generated);
 
         // app.add_systems(Update, debug_server_replicate);
     }
@@ -47,6 +48,21 @@ fn on_player_link(trigger: On<Add, LinkOf>, mut commands: Commands) {
         ReplicationSender::new(SEND_INTERVAL, SendUpdatesMode::SinceLastAck, false),
         Name::from("Client"),
     ));
+}
+
+pub fn on_seed_generated(
+    trigger: On<Add, WorldConfig>,
+    query: Single<&WorldConfig>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    #[cfg(all(not(feature = "atlas"), feature = "render"))] array_texture_loader: Res<
+        ArrayTextureLoader,
+    >,
+) {
+    info!("World config was generated {:#?}!", trigger.entity);
+
+    //generate world using seed, common function
+    shared_world_generator(query.seed, query.world_size, commands, asset_server);
 }
 
 fn on_player_connected(
@@ -121,6 +137,17 @@ pub fn startup(mut commands: Commands) {
         ))
         .id();
     commands.trigger(Start { entity: server });
+}
+
+pub fn generate_seed(mut commands: Commands) {
+    let seed: u64 = rand::random();
+    let world_config = commands.spawn((
+        WorldConfig {
+            seed,
+            world_size: 64,
+        },
+        Replicate::to_clients(NetworkTarget::All),
+    ));
 }
 
 /// Read client inputs and move players in server therefore giving a basis for other clients
