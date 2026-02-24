@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use bevy::log::*;
-use bevy::render::RenderPlugin;
 use bevy::{prelude::*, window::PresentMode};
 use clap::{Parser, Subcommand};
 use lightyear::prelude::{client::ClientPlugins, server::ServerPlugins, *};
@@ -162,6 +161,63 @@ fn main() {
 //     is_zero: bool,
 //     // Other input that could make sense would be e.g.
 //     // boost: bool
+// }
+
+// fn process_character_animation(
+//     time: Res<Time>,
+//     player: Single<(&mut AccumulatedInput, &mut CharacterAnimations, &mut Sprite)>,
+// ) {
+//     let (input, mut animations, mut sprite) = player.into_inner();
+
+//     match input.movement_direction {
+//         MovementDirection::Front => match input.is_zero {
+//             true => {
+//                 animations.current_animation = animations.idle_front;
+//             }
+//             false => {
+//                 animations.current_animation = animations.move_front;
+//             }
+//         },
+//         MovementDirection::Left => match input.is_zero {
+//             true => {
+//                 animations.current_animation = animations.idle_left;
+//             }
+//             false => {
+//                 animations.current_animation = animations.move_left;
+//             }
+//         },
+//         MovementDirection::Right => match input.is_zero {
+//             true => {
+//                 animations.current_animation = animations.idle_right;
+//             }
+//             false => {
+//                 animations.current_animation = animations.move_right;
+//             }
+//         },
+//         MovementDirection::Back => match input.is_zero {
+//             true => {
+//                 animations.current_animation = animations.idle_back;
+//             }
+//             false => {
+//                 animations.current_animation = animations.move_back;
+//             }
+//         },
+//     };
+
+//     animations.frame_timer.tick(time.delta());
+//     if let Some(atlas) = &mut sprite.texture_atlas {
+//         if input.is_new_direction {
+//             atlas.index = animations.current_animation.first_sprite_index;
+//         } else if animations.frame_timer.just_finished() {
+//             if atlas.index >= animations.current_animation.last_sprite_index
+//                 || atlas.index < animations.current_animation.first_sprite_index
+//             {
+//                 atlas.index = animations.current_animation.first_sprite_index;
+//             } else {
+//                 atlas.index += 1;
+//             }
+//         }
+//     }
 // }
 
 // fn accumulate_input(

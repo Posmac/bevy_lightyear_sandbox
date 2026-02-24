@@ -178,6 +178,6 @@ impl PlayerAnimations {
 //world generator
 #[derive(Debug, Component, Serialize, Deserialize, Clone, PartialEq, Reflect, Default)]
 pub struct WorldConfig {
-    pub seed: u64,
     pub world_size: u64,
+    pub seed: u32,
 }

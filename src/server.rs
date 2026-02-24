@@ -140,7 +140,7 @@ pub fn startup(mut commands: Commands) {
 }
 
 pub fn generate_seed(mut commands: Commands) {
-    let seed: u64 = rand::random();
+    let seed: u32 = rand::random();
     let world_config = commands.spawn((
         WorldConfig {
             seed,

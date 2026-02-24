@@ -70,10 +70,10 @@ fn camera_follow(
     player_query: Single<&PlayerPosition, With<Predicted>>,
     camera_query: Single<&mut Transform, With<Camera2d>>,
 ) {
-    // let player_pos = player_query.into_inner();
-    // let mut camera_transform = camera_query.into_inner();
-    // let target = Vec3::new(player_pos.0.x, player_pos.0.y, 0.0);
-    // camera_transform.translation = camera_transform.translation.lerp(target, 0.1);
+    let player_pos = player_query.into_inner();
+    let mut camera_transform = camera_query.into_inner();
+    let target = Vec3::new(player_pos.0.x, player_pos.0.y, 0.0);
+    camera_transform.translation = camera_transform.translation.lerp(target, 0.1);
 }
 
 pub fn startup(mut commands: Commands, config: Res<ClientId>) {
