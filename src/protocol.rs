@@ -1,64 +1,99 @@
+use avian2d::prelude::*;
 use bevy::ecs::entity::{EntityMapper, MapEntities};
-use bevy::math::Curve;
-use bevy::math::curve::{Ease, FunctionCurve, Interval};
 use bevy::prelude::{Deref, DerefMut};
-use bevy::{app::Plugin, ecs::component::Component, math::Vec2, reflect::Reflect};
+use bevy::{app::Plugin, ecs::component::Component, reflect::Reflect};
+use leafwing_input_manager::Actionlike;
+use lightyear::input::config::InputConfig;
+use lightyear::prelude::input::leafwing::InputPlugin;
 use lightyear::prelude::*;
+
 use serde::{Deserialize, Serialize};
 
 pub struct ProtocolPlugin;
 
 impl Plugin for ProtocolPlugin {
     fn build(&self, app: &mut bevy::app::App) {
-        app.add_plugins(input::native::InputPlugin::<Inputs>::default());
-        app.register_component::<PlayerPosition>()
+        // app.add_plugins(input::native::InputPlugin::<Inputs>::default());
+
+        app.add_plugins(InputPlugin::<Inputs> {
+            config: InputConfig::<Inputs> {
+                lag_compensation: true,
+                ..Default::default()
+            },
+        });
+
+        //physics parameters
+        app.register_component::<Position>()
             .add_prediction()
-            .add_linear_interpolation();
-        // app.register_component::<MovementDirection>();
+            .add_linear_interpolation()
+            .enable_correction();
+        app.register_component::<Rotation>()
+            .add_prediction()
+            .add_linear_interpolation()
+            .enable_correction();
+        app.register_component::<RigidBody>();
+
+        //other params
         app.register_component::<PlayerState>();
         app.register_component::<PlayerAnimations>();
         app.register_component::<WorldConfig>();
+
+        app.register_component::<PlayerId>();
+        app.register_component::<Score>();
+
+        app.register_component::<PlayerMarker>();
+        app.register_component::<BulletMarker>();
     }
 }
 
-impl Ease for PlayerPosition {
-    fn interpolating_curve_unbounded(start: Self, end: Self) -> impl Curve<Self> {
-        FunctionCurve::new(Interval::UNIT, move |t| {
-            PlayerPosition(Vec2::lerp(start.0, end.0, t))
-        })
-    }
-}
+// impl Ease for PlayerPosition {
+//     fn interpolating_curve_unbounded(start: Self, end: Self) -> impl Curve<Self> {
+//         FunctionCurve::new(Interval::UNIT, move |t| {
+//             PlayerPosition(Vec2::lerp(start.0, end.0, t))
+//         })
+//     }
+// }
 
 //Position component for player
-#[derive(
-    Debug, Component, Serialize, Deserialize, Clone, PartialEq, Reflect, Deref, DerefMut, Default,
-)]
-pub struct PlayerPosition(pub Vec2);
+// #[derive(
+//     Debug, Component, Serialize, Deserialize, Clone, PartialEq, Reflect, Deref, DerefMut, Default,
+// )]
+// pub struct PlayerPosition(pub Vec2);
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Clone, Reflect)]
-pub struct Direction {
-    pub front: bool,
-    pub back: bool,
-    pub left: bool,
-    pub right: bool,
-}
+// #[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq, Clone, Copy, Hash, Reflect)]
+// pub enum Direction {}
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Reflect)]
+#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq, Clone, Copy, Hash, Reflect)]
 pub enum Inputs {
-    Direction(Direction),
+    Up,
+    #[default]
+    Down,
+    Left,
+    Right,
+    Mouse,
+    Shoot,
 }
 
-impl Default for Inputs {
-    fn default() -> Self {
-        Self::Direction(Direction::default())
+impl Actionlike for Inputs {
+    fn input_control_kind(&self) -> leafwing_input_manager::InputControlKind {
+        match self {
+            Inputs::Mouse => leafwing_input_manager::InputControlKind::DualAxis,
+            _ => leafwing_input_manager::InputControlKind::Button,
+        }
     }
 }
 
-impl Direction {
-    pub fn is_none(&self) -> bool {
-        !self.front && !self.back && !self.left && !self.right
-    }
-}
+// impl Default for Inputs {
+//     fn default() -> Self {
+//         Self::Direction(Direction::default())
+//     }
+// }
+
+// impl Direction {
+//     pub fn is_none(&self) -> bool {
+//         !self.front && !self.back && !self.left && !self.right
+//     }
+// }
 
 impl MapEntities for Inputs {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {}
@@ -178,6 +213,21 @@ impl PlayerAnimations {
 //world generator
 #[derive(Debug, Component, Serialize, Deserialize, Clone, PartialEq, Reflect, Default)]
 pub struct WorldConfig {
-    pub world_size: u64,
     pub seed: u32,
+    pub world_size: u64,
 }
+
+//new
+#[derive(
+    Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect, Deref, DerefMut,
+)]
+pub struct Score(pub usize);
+
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Reflect)]
+pub struct PlayerId(pub PeerId);
+
+#[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
+pub struct BulletMarker;
+
+#[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
+pub struct PlayerMarker;

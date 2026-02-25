@@ -37,6 +37,7 @@ pub enum Mode {
 
 fn main() {
     let cli = Cli::parse();
+
     let mut app = App::new();
     let default_plugins = DefaultPlugins
         .set(ImagePlugin::default_nearest())

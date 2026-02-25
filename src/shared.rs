@@ -5,16 +5,29 @@ use std::{
     time::Duration,
 };
 
+use aeronet_websocket::rustls::quic::DirectionalKeys;
+use avian2d::{
+    PhysicsPlugins,
+    prelude::{Gravity, LinearVelocity, PhysicsTransformPlugin, Position, RigidBody, Rotation},
+};
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
+use leafwing_input_manager::prelude::ActionState;
+use lightyear::{
+    avian2d::plugin::{AvianReplicationMode, LightyearAvianPlugin},
+    prelude::{
+        ControlledBy, Interpolated, InterpolationTarget, LocalTimeline, NetworkTarget, PreSpawned,
+        Predicted, PredictionHistory, PredictionTarget, Replicate, Replicated,
+    },
+};
 use noise::{
     Fbm, Perlin,
     utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder},
 };
 
 use crate::protocol::{
-    AnimationConfig, Inputs, PlayerAnimations, PlayerPosition, PlayerState, PlayerStateEnum,
-    ProtocolPlugin,
+    AnimationConfig, BulletMarker, Inputs, PlayerAnimations, PlayerId, PlayerMarker, PlayerState,
+    PlayerStateEnum, ProtocolPlugin,
 };
 
 pub const FIXED_TIMESTEP_HZ: f64 = 64.0;
@@ -28,6 +41,14 @@ pub const SHARED_SETTINGS: SharedSettings = SharedSettings {
     protocol_id: 1997,
     private_key: [0; 32],
 };
+
+//physics common
+pub const EPS: f64 = 0.0001;
+pub const BULLET_MOVE_SPEED: f32 = 300.0;
+pub const MAP_LIMIT: f32 = 2000.0;
+pub const BULLET_SIZE: f32 = 3.0;
+pub const PLAYER_SIZE: f32 = 40.0;
+pub const BULLET_COLLISION_DISTANCE_CHECK: f32 = 4.0;
 
 #[derive(Copy, Clone, Debug)]
 pub struct SharedSettings {
@@ -43,6 +64,25 @@ pub struct SharedPlugin;
 impl Plugin for SharedPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(ProtocolPlugin);
+
+        app.add_plugins(LightyearAvianPlugin {
+            replication_mode: AvianReplicationMode::PositionButInterpolateTransform,
+            ..Default::default()
+        });
+
+        app.add_systems(PreUpdate, despawn_after);
+        //debug systems
+        app.add_systems(FixedLast, fixed_update_log);
+
+        app.add_systems(FixedUpdate, (player_movement, shoot_bullet).chain());
+
+        app.add_plugins(
+            PhysicsPlugins::default()
+                .build()
+                .disable::<PhysicsTransformPlugin>(),
+        )
+        .insert_resource(Gravity(Vec2::ZERO));
+
         app.add_systems(Startup, load_resources);
     }
 }
@@ -71,20 +111,46 @@ impl PlayerAnimationTimer {
     }
 }
 
+pub fn player_movement(
+    timeline: Res<LocalTimeline>,
+    mut player_query: Query<
+        (
+            &mut Position,
+            &mut Rotation,
+            &ActionState<Inputs>,
+            &PlayerId,
+        ),
+        (Or<(With<Predicted>, With<Replicate>)>, With<PlayerMarker>),
+    >,
+) {
+    for (position, rotation, action_state, player_id) in player_query.iter_mut() {
+        debug!(tick = ?timeline.tick(), action = ?action_state.dual_axis_data(&Inputs::Mouse), "Data in Movement (FixedUpdate)");
+        shared_movement_behaviour(position, rotation, action_state);
+    }
+}
+
 // This system defines how we update the player's positions when we receive an input
-pub fn shared_movement_behaviour(mut position: Mut<PlayerPosition>, input: &Inputs) {
+pub fn shared_movement_behaviour(
+    mut position: Mut<Position>,
+    mut rotation: Mut<Rotation>,
+    action: &ActionState<Inputs>,
+) {
     const MOVE_SPEED: f32 = 10.0;
-    let Inputs::Direction(direction) = input;
-    if direction.back {
+
+    if let Some(cursor_data) = action.dual_axis_data(&Inputs::Mouse) {
+    } else {
+    }
+
+    if action.pressed(&Inputs::Up) {
         position.y += MOVE_SPEED;
     }
-    if direction.front {
+    if action.pressed(&Inputs::Down) {
         position.y -= MOVE_SPEED;
     }
-    if direction.left {
+    if action.pressed(&Inputs::Left) {
         position.x -= MOVE_SPEED;
     }
-    if direction.right {
+    if action.pressed(&Inputs::Right) {
         position.x += MOVE_SPEED;
     }
 }
@@ -92,12 +158,19 @@ pub fn shared_movement_behaviour(mut position: Mut<PlayerPosition>, input: &Inpu
 pub fn shared_animation_behaviour(
     mut player_state: Mut<PlayerState>,
     // mut player_animations: Mut<PlayerAnimations>,
-    input: &Inputs,
+    action: &ActionState<Inputs>,
 ) {
-    let Inputs::Direction(direction) = input;
+    let mut is_none = true;
+    if action.pressed(&Inputs::Up)
+        || action.pressed(&Inputs::Down)
+        || action.pressed(&Inputs::Left)
+        || action.pressed(&Inputs::Right)
+    {
+        is_none = false;
+    }
 
     player_state.prev_state = player_state.current_state.clone();
-    if direction.is_none() {
+    if is_none {
         if player_state.current_state.is_walking() {
             let inverse_state = player_state.current_state.get_opposite_state();
             // let inverse_animation = player_animations.get_anim(&inverse_state);
@@ -107,21 +180,107 @@ pub fn shared_animation_behaviour(
         return;
     }
 
-    if direction.front {
+    if action.pressed(&Inputs::Up) {
         player_state.current_state = PlayerStateEnum::WalkingFront;
         // player_animations.current_animation = player_animations.move_front;
     }
-    if direction.back {
+    if action.pressed(&Inputs::Down) {
         player_state.current_state = PlayerStateEnum::WalkingBack;
         // player_animations.current_animation = player_animations.move_back;
     }
-    if direction.left {
+    if action.pressed(&Inputs::Left) {
         player_state.current_state = PlayerStateEnum::WalkingLeft;
         // player_animations.current_animation = player_animations.move_left;
     }
-    if direction.right {
+    if action.pressed(&Inputs::Right) {
         player_state.current_state = PlayerStateEnum::WalkingRight;
         // player_animations.current_animation = player_animations.move_right;
+    }
+}
+
+pub fn shoot_bullet(
+    timeline: Res<LocalTimeline>,
+    mut commands: Commands,
+    mut query: Query<
+        (
+            &PlayerId,
+            &Transform,
+            &mut ActionState<Inputs>,
+            Option<&ControlledBy>,
+        ),
+        (Or<(With<Predicted>, With<Replicate>)>, With<PlayerMarker>),
+    >,
+) {
+    let tick = timeline.tick();
+    for (id, transform, action, controlled_by) in query.iter_mut() {
+        let is_server = controlled_by.is_some();
+        // NOTE: pressed lets you shoot many bullets, which can be cool
+        if action.just_pressed(&Inputs::Shoot) {
+            error!(?tick, pos=?transform.translation.truncate(), rot=?transform.rotation.to_euler(EulerRot::XYZ).2, "spawn bullet");
+            // for delta in [-0.2, 0.2] {
+            for delta in [0.0] {
+                let salt: u64 = if delta < 0.0 { 0 } else { 1 };
+                // shoot from the position of the player, towards the cursor, with an angle of delta
+                let mut bullet_transform = transform.clone();
+                bullet_transform.rotate_z(delta);
+                let bullet_bundle = (
+                    bullet_transform,
+                    LinearVelocity(bullet_transform.up().as_vec3().truncate() * BULLET_MOVE_SPEED),
+                    RigidBody::Kinematic,
+                    // store the player who fired the bullet
+                    *id,
+                    // *color,
+                    BulletMarker,
+                    Name::new("Bullet"),
+                );
+
+                // on the server, replicate the bullet
+                if is_server {
+                    // #[cfg(feature = "server")]
+                    commands.spawn((
+                        bullet_bundle,
+                        // NOTE: the PreSpawned component indicates that the entity will be spawned on both client and server
+                        //  but the server will take authority as soon as the client receives the entity
+                        //  it does this by matching with the client entity that has the same hash
+                        //  The hash is computed automatically in PostUpdate from the entity's components + spawn tick
+                        //  unless you set the hash manually before PostUpdate to a value of your choice
+                        //
+                        // the default hashing algorithm uses the tick and component list. in order to disambiguate
+                        // between the two bullets, we add additional information to the hash.
+                        // NOTE: if you don't add the salt, the 'left' bullet on the server might get matched with the
+                        // 'right' bullet on the client, and vice versa. This is not critical, but it will cause a rollback
+                        PreSpawned::default_with_salt(salt),
+                        DespawnAfter(Timer::new(Duration::from_secs(2), TimerMode::Once)),
+                        Replicate::to_clients(NetworkTarget::All),
+                        PredictionTarget::to_clients(NetworkTarget::Single(id.0)),
+                        InterpolationTarget::to_clients(NetworkTarget::AllExceptSingle(id.0)),
+                        controlled_by.unwrap().clone(),
+                    ));
+                } else {
+                    // on the client, just spawn the ball
+                    // NOTE: the PreSpawned component indicates that the entity will be spawned on both client and server
+                    //  but the server will take authority as soon as the client receives the entity
+                    commands.spawn((bullet_bundle, PreSpawned::default_with_salt(salt)));
+                }
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+struct DespawnAfter(pub Timer);
+
+/// Despawn entities after their timer has finished
+fn despawn_after(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut DespawnAfter)>,
+) {
+    for (entity, mut despawn_after) in query.iter_mut() {
+        despawn_after.0.tick(time.delta());
+        if despawn_after.0.is_finished() {
+            commands.entity(entity).despawn();
+        }
     }
 }
 
@@ -188,23 +347,26 @@ pub fn shared_world_generator(
         ArrayTextureLoader,
     >,
 ) {
-    //generate world from noise
-    // https://www.boristhebrave.com/2013/07/14/tileset-roundup/?q=tutorials/tileset-roundup
-    // https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/blob.html
-    let noise_map: NoiseMap = generate_world_noise(seed, world_size);
-    let terrain_matrix = generate_terrain_matrix(&noise_map, world_size);
-    // log_terrain_matrix(&data);
-    let tileset_mask: Vec<u8> = generate_terrain_mask(&terrain_matrix, world_size);
-    log_mask_matrix(&tileset_mask, world_size);
-    // log_dense_masks(&tileset_mask, world_size as usize);
+    #[cfg(feature = "world_generator")]
+    {
+        //generate world from noise
+        // https://www.boristhebrave.com/2013/07/14/tileset-roundup/?q=tutorials/tileset-roundup
+        // https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/blob.html
+        let noise_map: NoiseMap = generate_world_noise(seed, world_size);
+        let terrain_matrix = generate_terrain_matrix(&noise_map, world_size);
+        // log_terrain_matrix(&data);
+        let tileset_mask: Vec<u8> = generate_terrain_mask(&terrain_matrix, world_size);
+        // log_mask_matrix(&tileset_mask, world_size);
+        // log_dense_masks(&tileset_mask, world_size as usize);
 
-    fill_tilemap_render(
-        world_size,
-        commands,
-        asset_server,
-        &terrain_matrix,
-        &tileset_mask,
-    );
+        fill_tilemap_render(
+            world_size,
+            commands,
+            asset_server,
+            &terrain_matrix,
+            &tileset_mask,
+        );
+    }
 }
 
 pub fn generate_world_noise(seed: u32, world_size: u64) -> NoiseMap {
@@ -511,5 +673,40 @@ pub fn fill_tilemap_render(
             tile_size,
             ..Default::default()
         });
+    }
+}
+
+//PHYSICS
+pub fn fixed_update_log(
+    timeline: Res<LocalTimeline>,
+    player: Query<(Entity, &Transform), (With<PlayerMarker>, With<PlayerId>)>,
+    predicted_bullet: Query<
+        (
+            Entity,
+            &Position,
+            &Transform,
+            Option<&PredictionHistory<Transform>>,
+        ),
+        With<BulletMarker>,
+    >,
+) {
+    let tick = timeline.tick();
+    for (entity, transform) in player.iter() {
+        debug!(
+            ?tick,
+            ?entity,
+            pos = ?transform.translation.truncate(),
+            "Player after fixed update"
+        );
+    }
+    for (entity, position, transform, history) in predicted_bullet.iter() {
+        info!(
+            ?tick,
+            ?entity,
+            ?position,
+            transform = ?transform.translation.truncate(),
+            ?history,
+            "Bullet after fixed update"
+        );
     }
 }

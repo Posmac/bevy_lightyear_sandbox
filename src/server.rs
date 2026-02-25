@@ -1,21 +1,24 @@
+use crate::{
+    protocol::{BulletMarker, Inputs, PlayerId, PlayerMarker, PlayerState, Score, WorldConfig},
+    shared::{
+        BULLET_COLLISION_DISTANCE_CHECK, PlayerAnimationTimer, PlayerSpriteSheetResource,
+        SEND_INTERVAL, SERVER_ADDR, SHARED_SETTINGS, get_player_anim_config,
+        shared_animation_behaviour, shared_movement_behaviour, shared_world_generator,
+    },
+};
 use aeronet_websocket::server::ServerConfig;
+use avian2d::prelude::{LinearVelocity, PhysicsSchedule, Position, RigidBody, SpatialQueryFilter};
 use bevy::prelude::*;
+use leafwing_input_manager::prelude::ActionState;
+use lightyear_avian2d::prelude::{
+    LagCompensationPlugin, LagCompensationSpatialQuery, LagCompensationSystems,
+};
+
 use lightyear::{
     netcode::{NetcodeServer, prelude::server},
     prelude::{
-        Connected, ControlledBy, InterpolationTarget, LinkOf, LocalAddr, LocalTimeline,
-        NetworkTarget, PredictionTarget, RemoteId, Replicate, ReplicationSender, SendUpdatesMode,
-        input::native::ActionState,
         server::{ClientOf, Start, WebSocketServerIo},
-    },
-};
-
-use crate::{
-    protocol::{Inputs, PlayerPosition, PlayerState, WorldConfig},
-    shared::{
-        PlayerAnimationTimer, PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_ADDR,
-        SHARED_SETTINGS, get_player_anim_config, shared_animation_behaviour,
-        shared_movement_behaviour, shared_world_generator,
+        *,
     },
 };
 
@@ -23,11 +26,25 @@ pub struct GameServerPlugin;
 
 impl Plugin for GameServerPlugin {
     fn build(&self, app: &mut App) {
+        app.add_plugins(LagCompensationPlugin);
         app.add_systems(Startup, (startup, generate_seed).chain());
-        app.add_systems(FixedUpdate, (movement, animation));
+        // app.add_systems(FixedUpdate, (movement, animation));
         app.add_observer(on_player_link);
         app.add_observer(on_player_connected);
         app.add_observer(on_seed_generated);
+        // the lag compensation systems need to run after LagCompensationSet::UpdateHistory
+        // app.add_systems(FixedUpdate, interpolated_bot_movement);
+        app.add_systems(
+            PhysicsSchedule,
+            // lag compensation collisions must run after the SpatialQuery has been updated
+            compute_hit_lag_compensation.in_set(LagCompensationSystems::Collisions),
+        );
+        // app.add_systems(
+        //     FixedPostUpdate,
+        //     // check collisions after physics have run
+        //     // compute_hit_prediction.after(PhysicsSystems::StepSimulation),
+        //     compute_hit_prediction.after(PhysicsSystems::StepSimulation),
+        // );
 
         // app.add_systems(Update, debug_server_replicate);
     }
@@ -70,6 +87,10 @@ fn on_player_connected(
     query: Query<&RemoteId, With<ClientOf>>,
     mut commands: Commands,
     player_resources: Res<PlayerSpriteSheetResource>,
+    replicated_players: Query<
+        (Entity, &InitialReplicated),
+        (Added<InitialReplicated>, With<PlayerId>),
+    >,
 ) {
     info!(
         "Handshake complete → client fully connected: {:?}",
@@ -84,8 +105,21 @@ fn on_player_connected(
 
     let entity = commands
         .spawn((
-            PlayerPosition::default(),
+            // PlayerPosition::default(),
             PlayerState::default(),
+            Score(0),
+            PlayerId(client_id),
+            PlayerMarker,
+            ActionState::<Inputs>::default(),
+            //
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            get_player_anim_config(),
+            PlayerAnimationTimer::new(2),
+            //
+            RigidBody::Kinematic,
+            Position::from_xy(0.0, 0.0),
+            // Rotation::default(),
+            //
             Replicate::to_clients(NetworkTarget::All),
             PredictionTarget::to_clients(NetworkTarget::Single(client_id)),
             InterpolationTarget::to_clients(NetworkTarget::AllExceptSingle(client_id)),
@@ -93,6 +127,7 @@ fn on_player_connected(
                 owner: trigger.entity,
                 lifetime: Default::default(),
             },
+            //visuals
             Sprite::from_atlas_image(
                 player_resources.player_image.clone(),
                 TextureAtlas {
@@ -100,9 +135,6 @@ fn on_player_connected(
                     index: 0,
                 },
             ),
-            Transform::from_scale(Vec3::splat(6.0)),
-            get_player_anim_config(),
-            PlayerAnimationTimer::new(2),
         ))
         .id();
 
@@ -151,28 +183,129 @@ pub fn generate_seed(mut commands: Commands) {
 }
 
 /// Read client inputs and move players in server therefore giving a basis for other clients
-fn movement(
+// fn movement(
+//     timeline: Res<LocalTimeline>,
+//     mut position_query: Query<
+//         (&mut Position, &mut Rotation, &ActionState<Inputs>),
+//         With<PlayerMarker>,
+//     >,
+// ) {
+//     let tick = timeline.tick();
+//     for (position, rotation, inputs) in position_query.iter_mut() {
+//         trace!(?tick, ?position, ?inputs, "server");
+//         shared_movement_behaviour(position, rotation, inputs);
+//     }
+// }
+
+// fn animation(
+//     timeline: Res<LocalTimeline>,
+//     mut player_query: Query<(
+//         &mut PlayerState,
+//         // &mut PlayerAnimations,
+//         &ActionState<Inputs>,
+//     )>,
+// ) {
+//     let tick = timeline.tick();
+//     for (state, inputs) in player_query.iter_mut() {
+//         trace!(?tick, ?state, ?inputs, "server");
+//         shared_animation_behaviour(state, inputs);
+//     }
+// }
+
+/// Compute hits if the bullet hits the bot, and increment the score on the player
+pub(crate) fn compute_hit_lag_compensation(
+    // instead of directly using avian's SpatialQuery, we want to use the LagCompensationSpatialQuery
+    // to apply lag-compensation (i.e. compute the collision between the bullet and the collider as it
+    // was seen by the client when they fired the shot)
+    mut commands: Commands,
     timeline: Res<LocalTimeline>,
-    mut position_query: Query<(&mut PlayerPosition, &ActionState<Inputs>)>,
+    query: LagCompensationSpatialQuery,
+    bullets: Query<
+        (Entity, &PlayerId, &Position, &LinearVelocity, &ControlledBy),
+        With<BulletMarker>,
+    >,
+    // the InterpolationDelay component is stored directly on the client entity
+    // (the server creates one entity for each client to store client-specific
+    // metadata)
+    client_query: Query<&InterpolationDelay, With<ClientOf>>,
+    mut player_query: Query<(&mut Score, &PlayerId), With<PlayerMarker>>,
 ) {
     let tick = timeline.tick();
-    for (position, inputs) in position_query.iter_mut() {
-        trace!(?tick, ?position, ?inputs, "server");
-        shared_movement_behaviour(position, inputs);
-    }
+    bullets
+        .iter()
+        .for_each(|(entity, id, position, velocity, controlled_by)| {
+            let Ok(delay) = client_query.get(controlled_by.owner) else {
+                error!("Could not retrieve InterpolationDelay for client {id:?}");
+                return;
+            };
+            if let Some(hit_data) = query.cast_ray(
+                // the delay is sent in every input message; the latest InterpolationDelay received
+                // is stored on the client entity
+                *delay,
+                position.0,
+                Dir2::new_unchecked(velocity.0.normalize()),
+                // TODO: shouldn't this be based on velocity length?
+                BULLET_COLLISION_DISTANCE_CHECK,
+                false,
+                &mut SpatialQueryFilter::default(),
+            ) {
+                info!(
+                    ?tick,
+                    ?hit_data,
+                    ?entity,
+                    "Collision with interpolated bot! Despawning bullet"
+                );
+                // if there is a hit, increment the score
+                player_query
+                    .iter_mut()
+                    .find(|(_, player_id)| player_id.0 == id.0)
+                    .map(|(mut score, _)| {
+                        score.0 += 1;
+                    });
+                commands.entity(entity).despawn();
+            }
+        })
 }
 
-fn animation(
-    timeline: Res<LocalTimeline>,
-    mut player_query: Query<(
-        &mut PlayerState,
-        // &mut PlayerAnimations,
-        &ActionState<Inputs>,
-    )>,
-) {
-    let tick = timeline.tick();
-    for (state, inputs) in player_query.iter_mut() {
-        trace!(?tick, ?state, ?inputs, "server");
-        shared_animation_behaviour(state, inputs);
-    }
-}
+// pub(crate) fn compute_hit_prediction(
+//     mut commands: Commands,
+//     timeline: Res<LocalTimeline>,
+//     query: SpatialQuery,
+//     bullets: Query<(Entity, &PlayerId, &Position, &LinearVelocity), With<BulletMarker>>,
+//     // bot_query: Query<(), With<PredictedBot>>,
+//     // the InterpolationDelay component is stored directly on the client entity
+//     // (the server creates one entity for each client to store client-specific
+//     // metadata)
+//     mut player_query: Query<(&mut Score, &PlayerId), With<PlayerMarker>>,
+// ) {
+//     let tick = timeline.tick();
+//     bullets.iter().for_each(|(entity, id, position, velocity)| {
+//         if let Some(hit_data) = query.cast_ray_predicate(
+//             position.0,
+//             Dir2::new_unchecked(velocity.0.normalize()),
+//             // TODO: shouldn't this be based on velocity length?
+//             BULLET_COLLISION_DISTANCE_CHECK,
+//             false,
+//             &SpatialQueryFilter::default(),
+//             &|entity| {
+//                 // only confirm the hit on predicted bots
+//                 bot_query.get(entity).is_ok()
+//             },
+//         ) {
+//             info!(
+//                 ?tick,
+//                 ?hit_data,
+//                 ?entity,
+//                 "Collision with predicted bot! Despawn bullet"
+//             );
+//             // if there is a hit, increment the score
+//             player_query
+//                 .iter_mut()
+//                 .find(|(_, player_id)| player_id.0 == id.0)
+//                 .map(|(mut score, _)| {
+//                     score.0 += 1;
+//                 });
+//             commands.entity(entity).despawn();
+//         }
+//     })
+// }
