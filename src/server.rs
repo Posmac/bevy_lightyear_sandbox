@@ -112,7 +112,7 @@ fn on_player_connected(
             PlayerMarker,
             ActionState::<Inputs>::default(),
             //
-            Transform::from_xyz(0.0, 0.0, 0.0),
+            Transform::from_scale(Vec3::splat(6.0)),
             get_player_anim_config(),
             PlayerAnimationTimer::new(2),
             //
@@ -194,21 +194,6 @@ pub fn generate_seed(mut commands: Commands) {
 //     for (position, rotation, inputs) in position_query.iter_mut() {
 //         trace!(?tick, ?position, ?inputs, "server");
 //         shared_movement_behaviour(position, rotation, inputs);
-//     }
-// }
-
-// fn animation(
-//     timeline: Res<LocalTimeline>,
-//     mut player_query: Query<(
-//         &mut PlayerState,
-//         // &mut PlayerAnimations,
-//         &ActionState<Inputs>,
-//     )>,
-// ) {
-//     let tick = timeline.tick();
-//     for (state, inputs) in player_query.iter_mut() {
-//         trace!(?tick, ?state, ?inputs, "server");
-//         shared_animation_behaviour(state, inputs);
 //     }
 // }
 

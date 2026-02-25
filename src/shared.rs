@@ -74,7 +74,10 @@ impl Plugin for SharedPlugin {
         //debug systems
         app.add_systems(FixedLast, fixed_update_log);
 
-        app.add_systems(FixedUpdate, (player_movement, shoot_bullet).chain());
+        app.add_systems(
+            FixedUpdate,
+            (player_movement, player_animation, shoot_bullet).chain(),
+        );
 
         app.add_plugins(
             PhysicsPlugins::default()
@@ -126,6 +129,21 @@ pub fn player_movement(
     for (position, rotation, action_state, player_id) in player_query.iter_mut() {
         debug!(tick = ?timeline.tick(), action = ?action_state.dual_axis_data(&Inputs::Mouse), "Data in Movement (FixedUpdate)");
         shared_movement_behaviour(position, rotation, action_state);
+    }
+}
+
+fn player_animation(
+    timeline: Res<LocalTimeline>,
+    mut player_query: Query<(
+        &mut PlayerState,
+        // &mut PlayerAnimations,
+        &ActionState<Inputs>,
+    )>,
+) {
+    let tick = timeline.tick();
+    for (state, inputs) in player_query.iter_mut() {
+        trace!(?tick, ?state, ?inputs, "server");
+        shared_animation_behaviour(state, inputs);
     }
 }
 

@@ -65,7 +65,6 @@ fn draw_aabb_envelope(query: Query<&ColliderAabb, With<AabbEnvelopeHolder>>, mut
 
 fn init(mut commands: Commands) {
     commands.spawn(Camera2d);
-
     #[cfg(feature = "client")]
     {
         commands.spawn((

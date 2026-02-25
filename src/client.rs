@@ -142,36 +142,6 @@ pub fn startup(mut commands: Commands, config: Res<ClientId>) {
     info!("Client created");
 }
 
-// pub fn buffer_input(
-//     mut query: Query<&mut ActionState<Inputs>, With<InputMarker<Inputs>>>,
-//     keypress: Res<ButtonInput<KeyCode>>,
-// ) {
-//     if let Ok(mut action_state) = query.single_mut() {
-//         let mut direction = Direction {
-//             front: false,
-//             back: false,
-//             left: false,
-//             right: false,
-//         };
-
-//         if keypress.pressed(KeyCode::KeyW) || keypress.pressed(KeyCode::ArrowUp) {
-//             direction.back = true;
-//         }
-//         if keypress.pressed(KeyCode::KeyS) || keypress.pressed(KeyCode::ArrowDown) {
-//             direction.front = true;
-//         }
-//         if keypress.pressed(KeyCode::KeyA) || keypress.pressed(KeyCode::ArrowLeft) {
-//             direction.left = true;
-//         }
-//         if keypress.pressed(KeyCode::KeyD) || keypress.pressed(KeyCode::ArrowRight) {
-//             direction.right = true;
-//         }
-//         // we always set the value. Setting it to None means that the input was missing, it's not the same
-//         // as saying that the input was 'no keys pressed'
-//         action_state.0 = Inputs::Direction(direction);
-//     }
-// }
-
 fn handle_predicted_spawn(
     trigger: On<Add, (PlayerId, Predicted)>,
     mut commands: Commands,
@@ -190,7 +160,7 @@ fn handle_predicted_spawn(
                     index: 0,
                 },
             ),
-            // Transform::from_scale(Vec3::splat(6.0)),
+            Transform::from_scale(Vec3::splat(6.0)),
             PlayerAnimationTimer::new(2),
             InputMap::new([
                 (Inputs::Up, KeyCode::KeyW),
@@ -242,44 +212,8 @@ fn handle_interpolated_spawn(
                 index: 0,
             },
         ),
-        // Transform::from_scale(Vec3::splat(6.0)),
+        Transform::from_scale(Vec3::splat(6.0)),
         PlayerAnimationTimer::new(2),
         // FrameInterpolate::<Transform>::default(),
     ));
 }
-
-// fn local_player_movement(
-//     timeline: Res<LocalTimeline>,
-//     mut position_query: Query<
-//         (
-//             &mut Position,
-//             &mut Rotation,
-//             &ActionState<Inputs>,
-//             &PlayerId,
-//         ),
-//         (With<Predicted>, With<PlayerMarker>),
-//     >,
-// ) {
-//     let tick = timeline.tick();
-//     for (position, rotation, input, player_id) in position_query.iter_mut() {
-//         shared_movement_behaviour(position, rotation, input);
-//     }
-// }
-
-// fn local_player_animation(
-//     // timeline: Res<LocalTimeline>,
-//     mut player_query: Query<
-//         (
-//             &mut PlayerState,
-//             // &mut PlayerAnimations,
-//             &ActionState<Inputs>,
-//         ),
-//         With<Predicted>,
-//     >,
-// ) {
-//     // let tick = timeline.tick();
-//     for (state, inputs) in player_query.iter_mut() {
-//         // trace!(?tick, ?state, ?anims, ?inputs, "server");
-//         shared_animation_behaviour(state, inputs);
-//     }
-// }
