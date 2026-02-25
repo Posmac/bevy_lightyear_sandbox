@@ -13,6 +13,7 @@ use avian2d::prelude::Rotation;
 use bevy::prelude::*;
 use leafwing_input_manager::plugin::InputManagerSystem;
 use leafwing_input_manager::prelude::ActionState;
+use leafwing_input_manager::prelude::Buttonlike;
 use leafwing_input_manager::prelude::InputMap;
 use lightyear::frame_interpolation::FrameInterpolate;
 use lightyear::input::client::InputSystems;
@@ -152,6 +153,20 @@ fn handle_predicted_spawn(
     if let Ok(marker) = query.get_mut(trigger.entity) {
         info!("Adding InputMarker to entity {:?} {:?}", entity, marker);
 
+        let mut input_map = InputMap::default();
+        input_map.insert_multiple([
+            (Inputs::Up, KeyCode::KeyW),
+            (Inputs::Up, KeyCode::ArrowUp),
+            (Inputs::Down, KeyCode::KeyS),
+            (Inputs::Down, KeyCode::ArrowDown),
+            (Inputs::Left, KeyCode::KeyA),
+            (Inputs::Left, KeyCode::ArrowLeft),
+            (Inputs::Right, KeyCode::KeyD),
+            (Inputs::Right, KeyCode::ArrowRight),
+            (Inputs::Shoot, KeyCode::Space),
+        ]);
+        input_map.insert(Inputs::Shoot, MouseButton::Left);
+
         commands.entity(entity).insert((
             Sprite::from_atlas_image(
                 player_resources.player_image.clone(),
@@ -162,17 +177,7 @@ fn handle_predicted_spawn(
             ),
             Transform::from_scale(Vec3::splat(6.0)),
             PlayerAnimationTimer::new(2),
-            InputMap::new([
-                (Inputs::Up, KeyCode::KeyW),
-                (Inputs::Down, KeyCode::KeyS),
-                (Inputs::Left, KeyCode::KeyA),
-                (Inputs::Right, KeyCode::KeyD),
-                (Inputs::Shoot, KeyCode::Space),
-                (Inputs::Up, KeyCode::ArrowUp),
-                (Inputs::Down, KeyCode::ArrowDown),
-                (Inputs::Left, KeyCode::ArrowLeft),
-                (Inputs::Right, KeyCode::ArrowRight),
-            ]),
+            input_map,
             FrameInterpolate::<Transform>::default(),
         ));
     }

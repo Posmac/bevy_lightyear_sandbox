@@ -50,12 +50,6 @@ impl Plugin for GameServerPlugin {
     }
 }
 
-// fn debug_server_replicate(query: Query<(Entity, &Replicate)>) {
-//     for (e, _) in query.iter() {
-//         info!("SERVER: Entity {:?} marked for replication", e);
-//     }
-// }
-
 fn on_player_link(trigger: On<Add, LinkOf>, mut commands: Commands) {
     info!(
         "Incoming UDP packet → spawned LinkOf entity: {:?}",
@@ -117,7 +111,7 @@ fn on_player_connected(
             PlayerAnimationTimer::new(2),
             //
             RigidBody::Kinematic,
-            Position::from_xy(0.0, 0.0),
+            // Position::from_xy(0.0, 0.0),
             // Rotation::default(),
             //
             Replicate::to_clients(NetworkTarget::All),
@@ -181,21 +175,6 @@ pub fn generate_seed(mut commands: Commands) {
         Replicate::to_clients(NetworkTarget::All),
     ));
 }
-
-/// Read client inputs and move players in server therefore giving a basis for other clients
-// fn movement(
-//     timeline: Res<LocalTimeline>,
-//     mut position_query: Query<
-//         (&mut Position, &mut Rotation, &ActionState<Inputs>),
-//         With<PlayerMarker>,
-//     >,
-// ) {
-//     let tick = timeline.tick();
-//     for (position, rotation, inputs) in position_query.iter_mut() {
-//         trace!(?tick, ?position, ?inputs, "server");
-//         shared_movement_behaviour(position, rotation, inputs);
-//     }
-// }
 
 /// Compute hits if the bullet hits the bot, and increment the score on the player
 pub(crate) fn compute_hit_lag_compensation(

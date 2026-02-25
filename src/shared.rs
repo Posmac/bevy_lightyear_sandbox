@@ -8,6 +8,7 @@ use std::{
 use aeronet_websocket::rustls::quic::DirectionalKeys;
 use avian2d::{
     PhysicsPlugins,
+    math::FRAC_PI_2,
     prelude::{Gravity, LinearVelocity, PhysicsTransformPlugin, Position, RigidBody, Rotation},
 };
 use bevy::prelude::*;
@@ -199,11 +200,11 @@ pub fn shared_animation_behaviour(
     }
 
     if action.pressed(&Inputs::Up) {
-        player_state.current_state = PlayerStateEnum::WalkingFront;
+        player_state.current_state = PlayerStateEnum::WalkingBack;
         // player_animations.current_animation = player_animations.move_front;
     }
     if action.pressed(&Inputs::Down) {
-        player_state.current_state = PlayerStateEnum::WalkingBack;
+        player_state.current_state = PlayerStateEnum::WalkingFront;
         // player_animations.current_animation = player_animations.move_back;
     }
     if action.pressed(&Inputs::Left) {
@@ -233,14 +234,18 @@ pub fn shoot_bullet(
     for (id, transform, action, controlled_by) in query.iter_mut() {
         let is_server = controlled_by.is_some();
         // NOTE: pressed lets you shoot many bullets, which can be cool
+        let cursor_pos = action.axis_pair(&Inputs::Mouse);
+        let player_pos = transform.translation.truncate();
+        let direction = (cursor_pos - player_pos).normalize_or_zero();
+
+        let angle = direction.y.atan2(direction.x);
         if action.just_pressed(&Inputs::Shoot) {
             error!(?tick, pos=?transform.translation.truncate(), rot=?transform.rotation.to_euler(EulerRot::XYZ).2, "spawn bullet");
             // for delta in [-0.2, 0.2] {
             for delta in [0.0] {
                 let salt: u64 = if delta < 0.0 { 0 } else { 1 };
-                // shoot from the position of the player, towards the cursor, with an angle of delta
-                let mut bullet_transform = transform.clone();
-                bullet_transform.rotate_z(delta);
+                let mut bullet_transform = Transform::from_translation(player_pos.extend(0.1));
+                bullet_transform.rotation = Quat::from_rotation_z(angle + delta - FRAC_PI_2);
                 let bullet_bundle = (
                     bullet_transform,
                     LinearVelocity(bullet_transform.up().as_vec3().truncate() * BULLET_MOVE_SPEED),
