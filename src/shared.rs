@@ -156,9 +156,9 @@ pub fn shared_movement_behaviour(
 ) {
     const MOVE_SPEED: f32 = 10.0;
 
-    if let Some(cursor_data) = action.dual_axis_data(&Inputs::Mouse) {
-    } else {
-    }
+    // if let Some(cursor_data) = action.dual_axis_data(&Inputs::Mouse) {
+    // } else {
+    // }
 
     if action.pressed(&Inputs::Up) {
         position.y += MOVE_SPEED;

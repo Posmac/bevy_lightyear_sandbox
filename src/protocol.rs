@@ -1,6 +1,7 @@
 use avian2d::prelude::*;
 use bevy::ecs::entity::{EntityMapper, MapEntities};
 use bevy::prelude::{Deref, DerefMut};
+use bevy::transform::components::Transform;
 use bevy::{app::Plugin, ecs::component::Component, reflect::Reflect};
 use leafwing_input_manager::Actionlike;
 use lightyear::input::config::InputConfig;
@@ -32,6 +33,7 @@ impl Plugin for ProtocolPlugin {
             .add_linear_interpolation()
             .enable_correction();
         app.register_component::<RigidBody>();
+        // app.register_component::<Transform>();
 
         //other params
         app.register_component::<PlayerState>();
@@ -43,6 +45,9 @@ impl Plugin for ProtocolPlugin {
 
         app.register_component::<PlayerMarker>();
         app.register_component::<BulletMarker>();
+
+        //bots
+        app.register_component::<BotMarker>();
     }
 }
 
@@ -231,3 +236,6 @@ pub struct BulletMarker;
 
 #[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
 pub struct PlayerMarker;
+
+#[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
+pub struct BotMarker;

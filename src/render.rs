@@ -138,54 +138,54 @@ pub fn draw(
 
 fn play_animation(
     time: Res<Time>,
-    mut player: Query<(
-        &PlayerState,
-        &mut PlayerAnimations,
-        &mut PlayerAnimationTimer,
-        &mut Sprite,
-    )>,
+    mut player_state: Query<(&Children, &PlayerState, &mut PlayerAnimations), With<PlayerMarker>>,
+    mut visual_query: Query<(&mut PlayerAnimationTimer, &mut Sprite)>,
 ) {
-    for (state, mut animations, mut timer, mut sprite) in player.iter_mut() {
-        timer.frame_timer.tick(time.delta());
-        if let Some(atlas) = &mut sprite.texture_atlas {
-            match state.current_state {
-                PlayerStateEnum::IdleFront => {
-                    animations.current_animation = animations.idle_front;
-                }
-                PlayerStateEnum::IdleBack => {
-                    animations.current_animation = animations.idle_back;
-                }
-                PlayerStateEnum::IdleLeft => {
-                    animations.current_animation = animations.idle_left;
-                }
-                PlayerStateEnum::IdleRight => {
-                    animations.current_animation = animations.idle_right;
-                }
-                PlayerStateEnum::WalkingFront => {
-                    animations.current_animation = animations.move_front;
-                }
-                PlayerStateEnum::WalkingBack => {
-                    animations.current_animation = animations.move_back;
-                }
-                PlayerStateEnum::WalkingLeft => {
-                    animations.current_animation = animations.move_left;
-                }
-                PlayerStateEnum::WalkingRight => {
-                    animations.current_animation = animations.move_right;
-                }
-            };
+    for (children, state, mut animations) in player_state.iter_mut() {
+        for child in children.iter() {
+            if let Ok((mut timer, mut sprite)) = visual_query.get_mut(child) {
+                timer.frame_timer.tick(time.delta());
+                if let Some(atlas) = &mut sprite.texture_atlas {
+                    match state.current_state {
+                        PlayerStateEnum::IdleFront => {
+                            animations.current_animation = animations.idle_front;
+                        }
+                        PlayerStateEnum::IdleBack => {
+                            animations.current_animation = animations.idle_back;
+                        }
+                        PlayerStateEnum::IdleLeft => {
+                            animations.current_animation = animations.idle_left;
+                        }
+                        PlayerStateEnum::IdleRight => {
+                            animations.current_animation = animations.idle_right;
+                        }
+                        PlayerStateEnum::WalkingFront => {
+                            animations.current_animation = animations.move_front;
+                        }
+                        PlayerStateEnum::WalkingBack => {
+                            animations.current_animation = animations.move_back;
+                        }
+                        PlayerStateEnum::WalkingLeft => {
+                            animations.current_animation = animations.move_left;
+                        }
+                        PlayerStateEnum::WalkingRight => {
+                            animations.current_animation = animations.move_right;
+                        }
+                    };
 
-            if state.prev_state != state.current_state {
-                atlas.index = animations.current_animation.first_sprite_index;
-                timer.frame_timer.finish();
-            } else {
-                if timer.frame_timer.just_finished() {
-                    if atlas.index >= animations.current_animation.last_sprite_index
-                        || atlas.index < animations.current_animation.first_sprite_index
-                    {
+                    if state.prev_state != state.current_state {
                         atlas.index = animations.current_animation.first_sprite_index;
+                        timer.frame_timer.finish();
                     } else {
-                        atlas.index += 1;
+                        if timer.frame_timer.just_finished() {
+                            if atlas.index >= animations.current_animation.last_sprite_index
+                                || atlas.index < animations.current_animation.first_sprite_index
+                            {
+                                atlas.index = animations.current_animation.first_sprite_index;
+                            } else {
+                                atlas.index += 1;
+                            }
+                        }
                     }
                 }
             }

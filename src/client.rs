@@ -167,7 +167,35 @@ fn handle_predicted_spawn(
         ]);
         input_map.insert(Inputs::Shoot, MouseButton::Left);
 
-        commands.entity(entity).insert((
+        commands
+            .entity(entity)
+            .insert((input_map, FrameInterpolate::<Transform>::default()));
+
+        commands.entity(entity).with_children(|parent| {
+            parent.spawn((
+                Sprite::from_atlas_image(
+                    player_resources.player_image.clone(),
+                    TextureAtlas {
+                        layout: player_resources.atlas.clone(),
+                        index: 0,
+                    },
+                ),
+                Transform::from_scale(Vec3::splat(6.0)),
+                PlayerAnimationTimer::new(2),
+            ));
+        });
+    }
+}
+
+fn handle_interpolated_spawn(
+    trigger: On<Add, Interpolated>,
+    mut commands: Commands,
+    player_resources: Res<PlayerSpriteSheetResource>,
+) {
+    let entity = trigger.entity;
+
+    commands.entity(entity).with_children(|parent| {
+        parent.spawn((
             Sprite::from_atlas_image(
                 player_resources.player_image.clone(),
                 TextureAtlas {
@@ -177,10 +205,8 @@ fn handle_predicted_spawn(
             ),
             Transform::from_scale(Vec3::splat(6.0)),
             PlayerAnimationTimer::new(2),
-            input_map,
-            FrameInterpolate::<Transform>::default(),
         ));
-    }
+    });
 }
 
 fn handle_world_config_spawn(
@@ -199,26 +225,4 @@ fn handle_world_config_spawn(
         commands,
         asset_server,
     );
-}
-
-fn handle_interpolated_spawn(
-    trigger: On<Add, Interpolated>,
-    mut commands: Commands,
-    player_resources: Res<PlayerSpriteSheetResource>,
-) {
-    let entity = trigger.entity;
-    // info!("Adding InputMarker to entity {:?}", entity);
-
-    commands.entity(entity).insert((
-        Sprite::from_atlas_image(
-            player_resources.player_image.clone(),
-            TextureAtlas {
-                layout: player_resources.atlas.clone(),
-                index: 0,
-            },
-        ),
-        Transform::from_scale(Vec3::splat(6.0)),
-        PlayerAnimationTimer::new(2),
-        // FrameInterpolate::<Transform>::default(),
-    ));
 }

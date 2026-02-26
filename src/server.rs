@@ -1,5 +1,7 @@
 use crate::{
-    protocol::{BulletMarker, Inputs, PlayerId, PlayerMarker, PlayerState, Score, WorldConfig},
+    protocol::{
+        BotMarker, BulletMarker, Inputs, PlayerId, PlayerMarker, PlayerState, Score, WorldConfig,
+    },
     shared::{
         BULLET_COLLISION_DISTANCE_CHECK, PlayerAnimationTimer, PlayerSpriteSheetResource,
         SEND_INTERVAL, SERVER_ADDR, SHARED_SETTINGS, get_player_anim_config,
@@ -7,11 +9,14 @@ use crate::{
     },
 };
 use aeronet_websocket::server::ServerConfig;
-use avian2d::prelude::{LinearVelocity, PhysicsSchedule, Position, RigidBody, SpatialQueryFilter};
+use avian2d::prelude::{
+    Collider, LinearVelocity, PhysicsSchedule, Position, RigidBody, SpatialQueryFilter,
+};
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::ActionState;
 use lightyear_avian2d::prelude::{
-    LagCompensationPlugin, LagCompensationSpatialQuery, LagCompensationSystems,
+    LagCompensationHistory, LagCompensationPlugin, LagCompensationSpatialQuery,
+    LagCompensationSystems,
 };
 
 use lightyear::{
@@ -27,7 +32,7 @@ pub struct GameServerPlugin;
 impl Plugin for GameServerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(LagCompensationPlugin);
-        app.add_systems(Startup, (startup, generate_seed).chain());
+        app.add_systems(Startup, (start_server, generate_seed, spawn_bots).chain());
         // app.add_systems(FixedUpdate, (movement, animation));
         app.add_observer(on_player_link);
         app.add_observer(on_player_connected);
@@ -106,13 +111,10 @@ fn on_player_connected(
             PlayerMarker,
             ActionState::<Inputs>::default(),
             //
-            Transform::from_scale(Vec3::splat(6.0)),
+            DisableReplicateHierarchy,
             get_player_anim_config(),
-            PlayerAnimationTimer::new(2),
             //
             RigidBody::Kinematic,
-            // Position::from_xy(0.0, 0.0),
-            // Rotation::default(),
             //
             Replicate::to_clients(NetworkTarget::All),
             PredictionTarget::to_clients(NetworkTarget::Single(client_id)),
@@ -121,15 +123,21 @@ fn on_player_connected(
                 owner: trigger.entity,
                 lifetime: Default::default(),
             },
-            //visuals
-            Sprite::from_atlas_image(
-                player_resources.player_image.clone(),
-                TextureAtlas {
-                    layout: player_resources.atlas.clone(),
-                    index: 0,
-                },
-            ),
         ))
+        .with_children(|parent| {
+            parent.spawn((
+                //visuals
+                Transform::from_scale(Vec3::splat(6.0)),
+                Sprite::from_atlas_image(
+                    player_resources.player_image.clone(),
+                    TextureAtlas {
+                        layout: player_resources.atlas.clone(),
+                        index: 0,
+                    },
+                ),
+                PlayerAnimationTimer::new(2),
+            ));
+        })
         .id();
 
     info!(
@@ -138,7 +146,7 @@ fn on_player_connected(
     );
 }
 
-pub fn startup(mut commands: Commands) {
+pub fn start_server(mut commands: Commands) {
     info!("Server created");
 
     let sans = vec![
@@ -174,6 +182,20 @@ pub fn generate_seed(mut commands: Commands) {
         },
         Replicate::to_clients(NetworkTarget::All),
     ));
+}
+
+pub fn spawn_bots(mut commands: Commands) {
+    static BOT_RADIUS: f32 = 15.0;
+
+    // commands.spawn((
+    //     BotMarker,
+    //     Replicate::to_clients(NetworkTarget::All),
+    //     InterpolationTarget::to_clients(NetworkTarget::All),
+    //     RigidBody::Kinematic,
+    //     Collider::circle(BOT_RADIUS),
+    //     LagCompensationHistory::default(),
+    //     Transform::from_xyz(200.0, 10.0, 0.0),
+    // ));
 }
 
 /// Compute hits if the bullet hits the bot, and increment the score on the player
