@@ -123,10 +123,14 @@ fn on_player_connected(
                 owner: trigger.entity,
                 lifetime: Default::default(),
             },
+            Transform::default(),
+            GlobalTransform::default(),
+            InheritedVisibility::default(),
         ))
         .with_children(|parent| {
             parent.spawn((
                 //visuals
+                InheritedVisibility::default(),
                 Transform::from_scale(Vec3::splat(6.0)),
                 Sprite::from_atlas_image(
                     player_resources.player_image.clone(),
@@ -186,7 +190,6 @@ pub fn generate_seed(mut commands: Commands) {
 
 pub fn spawn_bots(mut commands: Commands) {
     static BOT_RADIUS: f32 = 15.0;
-
     // commands.spawn((
     //     BotMarker,
     //     Replicate::to_clients(NetworkTarget::All),
@@ -195,6 +198,8 @@ pub fn spawn_bots(mut commands: Commands) {
     //     Collider::circle(BOT_RADIUS),
     //     LagCompensationHistory::default(),
     //     Transform::from_xyz(200.0, 10.0, 0.0),
+    //     Visibility::default(),
+    //     DisableReplicateHierarchy,
     // ));
 }
 

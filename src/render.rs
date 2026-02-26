@@ -1,6 +1,6 @@
 use crate::{
     protocol::*,
-    shared::{BULLET_SIZE, PlayerAnimationTimer},
+    shared::{BOT_RADIUS, BULLET_SIZE, GREEN, PlayerAnimationTimer},
 };
 use avian2d::prelude::{ColliderAabb, Position};
 use bevy::prelude::*;
@@ -29,6 +29,7 @@ impl Plugin for GameRendererPlugin {
         app.add_systems(PostUpdate, draw_aabb_envelope);
 
         app.add_observer(add_bullet_visuals);
+        app.add_observer(add_interpolated_bot_visuals);
     }
 }
 
@@ -191,4 +192,23 @@ fn play_animation(
             }
         }
     }
+}
+
+/// Add visuals to newly spawned bots
+fn add_interpolated_bot_visuals(
+    trigger: On<Add, BotMarker>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    let entity = trigger.entity;
+    // add visibility
+    commands.entity(entity).insert((
+        Visibility::default(),
+        Mesh2d(meshes.add(Mesh::from(Circle { radius: BOT_RADIUS }))),
+        MeshMaterial2d(materials.add(ColorMaterial {
+            color: GREEN.into(),
+            ..Default::default()
+        })),
+    ));
 }

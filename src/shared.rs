@@ -50,6 +50,24 @@ pub const MAP_LIMIT: f32 = 2000.0;
 pub const BULLET_SIZE: f32 = 3.0;
 pub const PLAYER_SIZE: f32 = 40.0;
 pub const BULLET_COLLISION_DISTANCE_CHECK: f32 = 4.0;
+pub const BOT_RADIUS: f32 = 15.0;
+
+pub const AQUA: Srgba = Srgba::rgb(0.0, 1.0, 1.0);
+pub const BLACK: Srgba = Srgba::rgb(0.0, 0.0, 0.0);
+pub const BLUE: Srgba = Srgba::rgb(0.0, 0.0, 1.0);
+pub const FUCHSIA: Srgba = Srgba::rgb(1.0, 0.0, 1.0);
+pub const GRAY: Srgba = Srgba::rgb(0.5019608, 0.5019608, 0.5019608);
+pub const GREEN: Srgba = Srgba::rgb(0.0, 0.5019608, 0.0);
+pub const LIME: Srgba = Srgba::rgb(0.0, 1.0, 0.0);
+pub const MAROON: Srgba = Srgba::rgb(0.5019608, 0.0, 0.0);
+pub const NAVY: Srgba = Srgba::rgb(0.0, 0.0, 0.5019608);
+pub const OLIVE: Srgba = Srgba::rgb(0.5019608, 0.5019608, 0.0);
+pub const PURPLE: Srgba = Srgba::rgb(0.5019608, 0.0, 0.5019608);
+pub const RED: Srgba = Srgba::rgb(1.0, 0.0, 0.0);
+pub const SILVER: Srgba = Srgba::rgb(0.7529412, 0.7529412, 0.7529412);
+pub const TEAL: Srgba = Srgba::rgb(0.0, 0.5019608, 0.5019608);
+pub const WHITE: Srgba = Srgba::rgb(1.0, 1.0, 1.0);
+pub const YELLOW: Srgba = Srgba::rgb(1.0, 1.0, 0.0);
 
 #[derive(Copy, Clone, Debug)]
 pub struct SharedSettings {
@@ -223,7 +241,7 @@ pub fn shoot_bullet(
     mut query: Query<
         (
             &PlayerId,
-            &Transform,
+            &Position,
             &mut ActionState<Inputs>,
             Option<&ControlledBy>,
         ),
@@ -231,16 +249,17 @@ pub fn shoot_bullet(
     >,
 ) {
     let tick = timeline.tick();
-    for (id, transform, action, controlled_by) in query.iter_mut() {
+    for (id, position, action, controlled_by) in query.iter_mut() {
         let is_server = controlled_by.is_some();
         // NOTE: pressed lets you shoot many bullets, which can be cool
         let cursor_pos = action.axis_pair(&Inputs::Mouse);
-        let player_pos = transform.translation.truncate();
+        let player_pos = position.0;
         let direction = (cursor_pos - player_pos).normalize_or_zero();
 
         let angle = direction.y.atan2(direction.x);
         if action.just_pressed(&Inputs::Shoot) {
-            error!(?tick, pos=?transform.translation.truncate(), rot=?transform.rotation.to_euler(EulerRot::XYZ).2, "spawn bullet");
+            // error!(?tick, pos=?player_pos, rot=?angle, "spawn bullet");
+            // error!(?tick, pos=?transform.translation.truncate(), rot=?transform.rotation.to_euler(EulerRot::XYZ).2, "spawn bullet");
             // for delta in [-0.2, 0.2] {
             for delta in [0.0] {
                 let salt: u64 = if delta < 0.0 { 0 } else { 1 };
@@ -714,22 +733,22 @@ pub fn fixed_update_log(
     >,
 ) {
     let tick = timeline.tick();
-    for (entity, transform) in player.iter() {
-        debug!(
-            ?tick,
-            ?entity,
-            pos = ?transform.translation.truncate(),
-            "Player after fixed update"
-        );
-    }
-    for (entity, position, transform, history) in predicted_bullet.iter() {
-        info!(
-            ?tick,
-            ?entity,
-            ?position,
-            transform = ?transform.translation.truncate(),
-            ?history,
-            "Bullet after fixed update"
-        );
-    }
+    // for (entity, transform) in player.iter() {
+    //     debug!(
+    //         ?tick,
+    //         ?entity,
+    //         pos = ?transform.translation.truncate(),
+    //         "Player after fixed update"
+    //     );
+    // }
+    // for (entity, position, transform, history) in predicted_bullet.iter() {
+    //     info!(
+    //         ?tick,
+    //         ?entity,
+    //         ?position,
+    //         transform = ?transform.translation.truncate(),
+    //         ?history,
+    //         "Bullet after fixed update"
+    //     );
+    // }
 }

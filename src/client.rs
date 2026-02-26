@@ -13,7 +13,6 @@ use avian2d::prelude::Rotation;
 use bevy::prelude::*;
 use leafwing_input_manager::plugin::InputManagerSystem;
 use leafwing_input_manager::prelude::ActionState;
-use leafwing_input_manager::prelude::Buttonlike;
 use leafwing_input_manager::prelude::InputMap;
 use lightyear::frame_interpolation::FrameInterpolate;
 use lightyear::input::client::InputSystems;
@@ -167,9 +166,13 @@ fn handle_predicted_spawn(
         ]);
         input_map.insert(Inputs::Shoot, MouseButton::Left);
 
-        commands
-            .entity(entity)
-            .insert((input_map, FrameInterpolate::<Transform>::default()));
+        commands.entity(entity).insert((
+            input_map,
+            FrameInterpolate::<Transform>::default(),
+            Transform::default(),
+            GlobalTransform::default(),
+            InheritedVisibility::default(),
+        ));
 
         commands.entity(entity).with_children(|parent| {
             parent.spawn((
@@ -181,6 +184,8 @@ fn handle_predicted_spawn(
                     },
                 ),
                 Transform::from_scale(Vec3::splat(6.0)),
+                GlobalTransform::default(),
+                InheritedVisibility::default(),
                 PlayerAnimationTimer::new(2),
             ));
         });
