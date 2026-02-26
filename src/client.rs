@@ -196,22 +196,26 @@ fn handle_interpolated_spawn(
     trigger: On<Add, Interpolated>,
     mut commands: Commands,
     player_resources: Res<PlayerSpriteSheetResource>,
+    player_query: Query<(), With<PlayerMarker>>,
 ) {
     let entity = trigger.entity;
 
-    commands.entity(entity).with_children(|parent| {
-        parent.spawn((
-            Sprite::from_atlas_image(
-                player_resources.player_image.clone(),
-                TextureAtlas {
-                    layout: player_resources.atlas.clone(),
-                    index: 0,
-                },
-            ),
-            Transform::from_scale(Vec3::splat(6.0)),
-            PlayerAnimationTimer::new(2),
-        ));
-    });
+    if let Ok(v) = player_query.get(entity) {
+        // info!("Spawned interpolated player");
+        commands.entity(entity).with_children(|parent| {
+            parent.spawn((
+                Sprite::from_atlas_image(
+                    player_resources.player_image.clone(),
+                    TextureAtlas {
+                        layout: player_resources.atlas.clone(),
+                        index: 0,
+                    },
+                ),
+                Transform::from_scale(Vec3::splat(6.0)),
+                PlayerAnimationTimer::new(2),
+            ));
+        });
+    }
 }
 
 fn handle_world_config_spawn(

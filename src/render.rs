@@ -1,7 +1,9 @@
 use crate::{
+    client::ClientId,
     protocol::*,
     shared::{BOT_RADIUS, BULLET_SIZE, GREEN, PlayerAnimationTimer},
 };
+use aeronet_websocket::client::ClientConfig;
 use avian2d::prelude::{ColliderAabb, Position};
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::TilemapPlugin;
@@ -200,15 +202,28 @@ fn add_interpolated_bot_visuals(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    client_id: Option<Res<ClientId>>,
 ) {
     let entity = trigger.entity;
+    if client_id.is_some() {
+        commands.entity(entity).insert((
+            Transform::from_xyz(200.0, 10.0, 0.0),
+            GlobalTransform::default(),
+            InheritedVisibility::default(),
+        ));
+    }
+
     // add visibility
-    commands.entity(entity).insert((
-        Visibility::default(),
-        Mesh2d(meshes.add(Mesh::from(Circle { radius: BOT_RADIUS }))),
-        MeshMaterial2d(materials.add(ColorMaterial {
-            color: GREEN.into(),
-            ..Default::default()
-        })),
-    ));
+    commands.entity(entity).with_children(|parent| {
+        parent.spawn((
+            Mesh2d(meshes.add(Mesh::from(Circle { radius: BOT_RADIUS }))),
+            MeshMaterial2d(materials.add(ColorMaterial {
+                color: GREEN.into(),
+                ..Default::default()
+            })),
+            Transform::default(),
+            GlobalTransform::default(),
+            InheritedVisibility::default(),
+        ));
+    });
 }

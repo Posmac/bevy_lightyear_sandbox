@@ -190,17 +190,18 @@ pub fn generate_seed(mut commands: Commands) {
 
 pub fn spawn_bots(mut commands: Commands) {
     static BOT_RADIUS: f32 = 15.0;
-    // commands.spawn((
-    //     BotMarker,
-    //     Replicate::to_clients(NetworkTarget::All),
-    //     InterpolationTarget::to_clients(NetworkTarget::All),
-    //     RigidBody::Kinematic,
-    //     Collider::circle(BOT_RADIUS),
-    //     LagCompensationHistory::default(),
-    //     Transform::from_xyz(200.0, 10.0, 0.0),
-    //     Visibility::default(),
-    //     DisableReplicateHierarchy,
-    // ));
+    commands.spawn((
+        BotMarker,
+        Replicate::to_clients(NetworkTarget::All),
+        InterpolationTarget::to_clients(NetworkTarget::All),
+        RigidBody::Kinematic,
+        Collider::circle(BOT_RADIUS),
+        LagCompensationHistory::default(),
+        Transform::from_xyz(200.0, 10.0, 0.0),
+        GlobalTransform::default(),
+        InheritedVisibility::default(),
+        DisableReplicateHierarchy,
+    ));
 }
 
 /// Compute hits if the bullet hits the bot, and increment the score on the player
