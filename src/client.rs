@@ -193,15 +193,21 @@ fn handle_predicted_spawn(
 }
 
 fn handle_interpolated_spawn(
-    trigger: On<Add, Interpolated>,
+    trigger: On<Add, PlayerMarker>,
     mut commands: Commands,
     player_resources: Res<PlayerSpriteSheetResource>,
-    player_query: Query<(), With<PlayerMarker>>,
+    player_query: Query<(), Added<Interpolated>>,
 ) {
     let entity = trigger.entity;
 
     if let Ok(v) = player_query.get(entity) {
-        // info!("Spawned interpolated player");
+        info!("Spawned interpolated player");
+        commands.entity(entity).insert((
+            Transform::default(),
+            GlobalTransform::default(),
+            InheritedVisibility::default(),
+        ));
+
         commands.entity(entity).with_children(|parent| {
             parent.spawn((
                 Sprite::from_atlas_image(
@@ -212,6 +218,8 @@ fn handle_interpolated_spawn(
                     },
                 ),
                 Transform::from_scale(Vec3::splat(6.0)),
+                GlobalTransform::default(),
+                InheritedVisibility::default(),
                 PlayerAnimationTimer::new(2),
             ));
         });
