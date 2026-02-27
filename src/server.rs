@@ -205,7 +205,7 @@ pub fn spawn_bots(mut commands: Commands) {
 }
 
 /// Compute hits if the bullet hits the bot, and increment the score on the player
-pub(crate) fn compute_hit_lag_compensation(
+pub fn compute_hit_lag_compensation(
     // instead of directly using avian's SpatialQuery, we want to use the LagCompensationSpatialQuery
     // to apply lag-compensation (i.e. compute the collision between the bullet and the collider as it
     // was seen by the client when they fired the shot)
@@ -247,13 +247,43 @@ pub(crate) fn compute_hit_lag_compensation(
                     ?entity,
                     "Collision with interpolated bot! Despawning bullet"
                 );
-                // if there is a hit, increment the score
-                player_query
-                    .iter_mut()
-                    .find(|(_, player_id)| player_id.0 == id.0)
-                    .map(|(mut score, _)| {
+
+                let mut found = false;
+                let bullet_owner_id = id.0; // ID из пули
+                for (mut score, p_id) in player_query.iter_mut() {
+                    if p_id.0 == bullet_owner_id {
                         score.0 += 1;
-                    });
+                        info!(
+                            "SUCCESS: Score increased for player {:?}. New score: {}",
+                            bullet_owner_id, score.0
+                        );
+                        found = true;
+                        break;
+                    } else {
+                        // Этот лог скажет тебе, какие ID вообще есть в мире
+                        info!(
+                            "DEBUG: Skipping player with ID {:?} (bullet was from {:?})",
+                            p_id.0, bullet_owner_id
+                        );
+                    }
+                }
+
+                if !found {
+                    warn!(
+                        "ERROR: Hit confirmed, but NO PLAYER found with ID {:?} in query!",
+                        bullet_owner_id
+                    );
+                    // Проверим, а есть ли вообще игроки в этом квери
+                    info!("Total players in query: {}", player_query.iter().count());
+                }
+
+                // if there is a hit, increment the score
+                // player_query
+                //     .iter_mut()
+                //     .find(|(_, player_id)| player_id.0 == id.0)
+                //     .map(|(mut score, _)| {
+                //         score.0 += 1;
+                //     });
                 commands.entity(entity).despawn();
             }
         })

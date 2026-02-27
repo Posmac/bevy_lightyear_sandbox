@@ -7,6 +7,8 @@ use aeronet_websocket::client::ClientConfig;
 use avian2d::prelude::{ColliderAabb, Position};
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::TilemapPlugin;
+#[cfg(feature = "client")]
+use lightyear::prelude::Predicted;
 use lightyear::{
     frame_interpolation::{FrameInterpolate, FrameInterpolationPlugin},
     prelude::{Interpolated, Replicated},
@@ -41,7 +43,7 @@ struct ScoreText;
 #[cfg(feature = "client")]
 fn display_score(
     mut score_text: Query<&mut Text, With<ScoreText>>,
-    hits: Query<&Score, With<Replicated>>,
+    hits: Query<&Score, With<Predicted>>,
 ) {
     if let Ok(score) = hits.single() {
         if let Ok(mut text) = score_text.single_mut() {
