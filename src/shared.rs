@@ -25,6 +25,7 @@ use lightyear::{
         Predicted, PredictionHistory, PredictionTarget, Replicate, Replicated,
     },
 };
+use lightyear_avian2d::prelude::LagCompensationHistory;
 use noise::{
     Fbm, Perlin,
     utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder},
@@ -739,6 +740,7 @@ impl WallBundle {
                 restitution: Restitution::new(0.0),
                 constraint: LockedAxes::new().lock_rotation(),
                 dumping: LinearDamping(1.0),
+                lag_history: LagCompensationHistory::default(),
             },
             wall: Wall {
                 start: start,

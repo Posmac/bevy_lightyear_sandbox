@@ -10,6 +10,7 @@ use lightyear::input::config::InputConfig;
 use lightyear::prelude::input::leafwing::InputPlugin;
 use lightyear::prelude::*;
 
+use lightyear_avian2d::prelude::LagCompensationHistory;
 use serde::{Deserialize, Serialize};
 
 use crate::shared::{BOT_RADIUS, PLAYER_SIZE};
@@ -272,6 +273,7 @@ pub struct PhysicsBundle {
     pub restitution: Restitution,
     pub constraint: LockedAxes,
     pub dumping: LinearDamping,
+    pub lag_history: LagCompensationHistory,
 }
 
 impl PhysicsBundle {
@@ -283,6 +285,7 @@ impl PhysicsBundle {
             restitution: Restitution::new(0.0),
             constraint: LockedAxes::new().lock_rotation(),
             dumping: LinearDamping(1.0),
+            lag_history: LagCompensationHistory::default(),
         }
     }
 }
