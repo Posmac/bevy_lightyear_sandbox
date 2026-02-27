@@ -46,32 +46,13 @@ impl Plugin for GameClientPlugin {
         // app.add_systems(FixedUpdate, local_player_movement);
         // app.add_systems(FixedUpdate, local_player_animation);
         // app.add_systems(Update, debug_sync);
-        app.add_systems(Update, camera_follow);
+        app.add_systems(PostUpdate, camera_follow);
         app.add_observer(handle_predicted_spawn);
         app.add_observer(handle_interpolated_spawn);
         app.add_observer(handle_world_config_spawn);
     }
 }
 
-// fn debug_sync(
-//     query: Query<(
-//         Entity,
-//         Option<&ActionState<Inputs>>,
-//         Option<&Predicted>,
-//         Option<&InputMarker<Inputs>>,
-//     )>,
-// ) {
-//     for (ent, action_state, pred, marker) in query.iter() {
-//         info!(
-//             "ENTITY: {:?} | HasActionState: {} | Predicted: {} | HasMarker: {}",
-//             ent,
-//             action_state.is_some(),
-//             pred.is_some(),
-//             marker.is_some()
-//         );
-//     }
-// }
-//
 fn camera_follow(
     player_query: Single<&Position, (With<Predicted>, With<PlayerMarker>)>,
     camera_query: Single<&mut Transform, With<Camera2d>>,
@@ -168,10 +149,12 @@ fn handle_predicted_spawn(
 
         commands.entity(entity).insert((
             input_map,
-            FrameInterpolate::<Transform>::default(),
+            FrameInterpolate::<Position>::default(),
+            FrameInterpolate::<Rotation>::default(),
             Transform::default(),
             GlobalTransform::default(),
             InheritedVisibility::default(),
+            PhysicsBundle::player(),
         ));
 
         commands.entity(entity).with_children(|parent| {

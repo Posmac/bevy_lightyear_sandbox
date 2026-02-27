@@ -1,17 +1,20 @@
 use crate::{
     client::ClientId,
     protocol::*,
-    shared::{BOT_RADIUS, BULLET_SIZE, GREEN, PlayerAnimationTimer},
+    shared::{BOT_RADIUS, BULLET_SIZE, PlayerAnimationTimer, Wall},
 };
 use aeronet_websocket::client::ClientConfig;
-use avian2d::prelude::{ColliderAabb, Position};
-use bevy::prelude::*;
+use avian2d::prelude::{ColliderAabb, PhysicsDebugPlugin, Position, Rotation};
+use bevy::{
+    color::palettes::css::{BLUE, GREEN},
+    prelude::*,
+};
 use bevy_ecs_tilemap::prelude::TilemapPlugin;
 #[cfg(feature = "client")]
 use lightyear::prelude::Predicted;
 use lightyear::{
     frame_interpolation::{FrameInterpolate, FrameInterpolationPlugin},
-    prelude::{Interpolated, Replicated},
+    prelude::{Interpolated, InterpolationSystems, Replicated, RollbackSystems},
 };
 use lightyear_avian2d::prelude::AabbEnvelopeHolder;
 
@@ -21,16 +24,23 @@ pub struct GameRendererPlugin;
 impl Plugin for GameRendererPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(TilemapPlugin);
-        app.add_plugins(FrameInterpolationPlugin::<Transform>::default());
+        app.add_plugins(FrameInterpolationPlugin::<Position>::default());
+        app.add_plugins(FrameInterpolationPlugin::<Rotation>::default());
+        app.add_plugins(PhysicsDebugPlugin::default());
 
         app.add_systems(Startup, init);
-        app.add_systems(Update, play_animation);
 
         #[cfg(feature = "client")]
-        app.add_systems(Update, display_score);
-
+        app.add_systems(PostUpdate, display_score);
+        app.add_systems(PostUpdate, play_animation);
         #[cfg(feature = "server")]
         app.add_systems(PostUpdate, draw_aabb_envelope);
+        app.add_systems(
+            PostUpdate,
+            draw_walls
+                .after(InterpolationSystems::Interpolate)
+                .after(RollbackSystems::VisualCorrection),
+        );
 
         app.add_observer(add_bullet_visuals);
         app.add_observer(add_interpolated_bot_visuals);
@@ -104,42 +114,43 @@ fn add_bullet_visuals(
             })),
         ));
         if interpolated {
-            commands
-                .entity(trigger.entity)
-                .insert(FrameInterpolate::<Transform>::default());
+            commands.entity(trigger.entity).insert((
+                FrameInterpolate::<Position>::default(),
+                FrameInterpolate::<Rotation>::default(),
+            ));
         }
     }
 }
 
-/// System that draws the boxes of the player positions.
-/// The components should be replicated from the server to the client
-pub fn draw(
-    mut gizmos: Gizmos,
-    mut players: Query<(&Position, &mut Transform), With<PlayerMarker>>,
-) {
-    for (position, mut trx) in players.iter_mut() {
-        gizmos.rect_2d(
-            Isometry2d::from_translation(position.0),
-            Vec2::ONE * 100.0,
-            Color::LinearRgba(LinearRgba {
-                red: 1.0,
-                green: 0.0,
-                blue: 0.0,
-                alpha: 1.0,
-            }),
-        );
+// /// System that draws the boxes of the player positions.
+// /// The components should be replicated from the server to the client
+// pub fn draw(
+//     mut gizmos: Gizmos,
+//     mut players: Query<(&Position, &mut Transform), With<PlayerMarker>>,
+// ) {
+//     for (position, mut trx) in players.iter_mut() {
+//         gizmos.rect_2d(
+//             Isometry2d::from_translation(position.0),
+//             Vec2::ONE * 100.0,
+//             Color::LinearRgba(LinearRgba {
+//                 red: 1.0,
+//                 green: 0.0,
+//                 blue: 0.0,
+//                 alpha: 1.0,
+//             }),
+//         );
 
-        let velocity = Vec3 {
-            x: position.0.x,
-            y: position.0.y,
-            z: 0.0,
-        };
-        // .normalize_or_zero()
-        //     * SPEED
-        //     * time.delta_secs();
-        trx.translation = velocity;
-    }
-}
+//         let velocity = Vec3 {
+//             x: position.0.x,
+//             y: position.0.y,
+//             z: 0.0,
+//         };
+//         // .normalize_or_zero()
+//         //     * SPEED
+//         //     * time.delta_secs();
+//         trx.translation = velocity;
+//     }
+// }
 
 fn play_animation(
     time: Res<Time>,
@@ -228,4 +239,10 @@ fn add_interpolated_bot_visuals(
             InheritedVisibility::default(),
         ));
     });
+}
+
+fn draw_walls(mut gizmos: Gizmos, walls: Query<&Wall, ()>) {
+    for wall in &walls {
+        gizmos.line_2d(wall.start, wall.end, BLUE);
+    }
 }

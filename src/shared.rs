@@ -9,7 +9,11 @@ use aeronet_websocket::rustls::quic::DirectionalKeys;
 use avian2d::{
     PhysicsPlugins,
     math::FRAC_PI_2,
-    prelude::{Gravity, LinearVelocity, PhysicsTransformPlugin, Position, RigidBody, Rotation},
+    prelude::{
+        Collider, ColliderDensity, Gravity, LinearDamping, LinearVelocity, LockedAxes,
+        PhysicsInterpolationPlugin, PhysicsTransformPlugin, Position, Restitution, RigidBody,
+        Rotation,
+    },
 };
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
@@ -27,8 +31,8 @@ use noise::{
 };
 
 use crate::protocol::{
-    AnimationConfig, BulletMarker, Inputs, PlayerAnimations, PlayerId, PlayerMarker, PlayerState,
-    PlayerStateEnum, ProtocolPlugin,
+    AnimationConfig, BulletMarker, Inputs, PhysicsBundle, PlayerAnimations, PlayerId, PlayerMarker,
+    PlayerState, PlayerStateEnum, ProtocolPlugin,
 };
 
 pub const FIXED_TIMESTEP_HZ: f64 = 64.0;
@@ -48,26 +52,10 @@ pub const EPS: f64 = 0.0001;
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const MAP_LIMIT: f32 = 2000.0;
 pub const BULLET_SIZE: f32 = 3.0;
-pub const PLAYER_SIZE: f32 = 40.0;
+pub const PLAYER_SIZE: f32 = 80.0;
 pub const BULLET_COLLISION_DISTANCE_CHECK: f32 = 4.0;
 pub const BOT_RADIUS: f32 = 15.0;
-
-pub const AQUA: Srgba = Srgba::rgb(0.0, 1.0, 1.0);
-pub const BLACK: Srgba = Srgba::rgb(0.0, 0.0, 0.0);
-pub const BLUE: Srgba = Srgba::rgb(0.0, 0.0, 1.0);
-pub const FUCHSIA: Srgba = Srgba::rgb(1.0, 0.0, 1.0);
-pub const GRAY: Srgba = Srgba::rgb(0.5019608, 0.5019608, 0.5019608);
-pub const GREEN: Srgba = Srgba::rgb(0.0, 0.5019608, 0.0);
-pub const LIME: Srgba = Srgba::rgb(0.0, 1.0, 0.0);
-pub const MAROON: Srgba = Srgba::rgb(0.5019608, 0.0, 0.0);
-pub const NAVY: Srgba = Srgba::rgb(0.0, 0.0, 0.5019608);
-pub const OLIVE: Srgba = Srgba::rgb(0.5019608, 0.5019608, 0.0);
-pub const PURPLE: Srgba = Srgba::rgb(0.5019608, 0.0, 0.5019608);
-pub const RED: Srgba = Srgba::rgb(1.0, 0.0, 0.0);
-pub const SILVER: Srgba = Srgba::rgb(0.7529412, 0.7529412, 0.7529412);
-pub const TEAL: Srgba = Srgba::rgb(0.0, 0.5019608, 0.5019608);
-pub const WHITE: Srgba = Srgba::rgb(1.0, 1.0, 1.0);
-pub const YELLOW: Srgba = Srgba::rgb(1.0, 1.0, 0.0);
+pub const WALL_SIZE: f32 = 350.0;
 
 #[derive(Copy, Clone, Debug)]
 pub struct SharedSettings {
@@ -90,8 +78,8 @@ impl Plugin for SharedPlugin {
         });
 
         app.add_systems(PreUpdate, despawn_after);
+        app.add_systems(Startup, init_walls);
         //debug systems
-        app.add_systems(FixedLast, fixed_update_log);
 
         app.add_systems(
             FixedUpdate,
@@ -101,7 +89,8 @@ impl Plugin for SharedPlugin {
         app.add_plugins(
             PhysicsPlugins::default()
                 .build()
-                .disable::<PhysicsTransformPlugin>(),
+                .disable::<PhysicsTransformPlugin>()
+                .disable::<PhysicsInterpolationPlugin>(),
         )
         .insert_resource(Gravity(Vec2::ZERO));
 
@@ -139,15 +128,16 @@ pub fn player_movement(
         (
             &mut Position,
             &mut Rotation,
+            &mut LinearVelocity,
             &ActionState<Inputs>,
             &PlayerId,
         ),
         (Or<(With<Predicted>, With<Replicate>)>, With<PlayerMarker>),
     >,
 ) {
-    for (position, rotation, action_state, player_id) in player_query.iter_mut() {
+    for (position, rotation, vel, action_state, player_id) in player_query.iter_mut() {
         debug!(tick = ?timeline.tick(), action = ?action_state.dual_axis_data(&Inputs::Mouse), "Data in Movement (FixedUpdate)");
-        shared_movement_behaviour(position, rotation, action_state);
+        shared_movement_behaviour(position, rotation, vel, action_state);
     }
 }
 
@@ -170,26 +160,34 @@ fn player_animation(
 pub fn shared_movement_behaviour(
     mut position: Mut<Position>,
     mut rotation: Mut<Rotation>,
+    mut velocity: Mut<LinearVelocity>,
     action: &ActionState<Inputs>,
 ) {
-    const MOVE_SPEED: f32 = 10.0;
+    const MOVE_SPEED: f32 = 350.0;
 
     // if let Some(cursor_data) = action.dual_axis_data(&Inputs::Mouse) {
     // } else {
     // }
+    const MAX_VELOCITY: f32 = 200.0;
+    *velocity = LinearVelocity(Vec2::ZERO);
 
     if action.pressed(&Inputs::Up) {
-        position.y += MOVE_SPEED;
+        // position.y += MOVE_SPEED;
+        velocity.y += MOVE_SPEED;
     }
     if action.pressed(&Inputs::Down) {
-        position.y -= MOVE_SPEED;
+        // position.y -= MOVE_SPEED;
+        velocity.y -= MOVE_SPEED;
     }
     if action.pressed(&Inputs::Left) {
-        position.x -= MOVE_SPEED;
+        // position.x -= MOVE_SPEED;
+        velocity.x -= MOVE_SPEED;
     }
     if action.pressed(&Inputs::Right) {
-        position.x += MOVE_SPEED;
+        // position.x += MOVE_SPEED;
+        velocity.x += MOVE_SPEED;
     }
+    // *velocity = LinearVelocity(velocity.clamp_length_max(MAX_VELOCITY));
 }
 
 pub fn shared_animation_behaviour(
@@ -718,37 +716,54 @@ pub fn fill_tilemap_render(
     }
 }
 
-//PHYSICS
-pub fn fixed_update_log(
-    timeline: Res<LocalTimeline>,
-    player: Query<(Entity, &Transform), (With<PlayerMarker>, With<PlayerId>)>,
-    predicted_bullet: Query<
-        (
-            Entity,
-            &Position,
-            &Transform,
-            Option<&PredictionHistory<Transform>>,
-        ),
-        With<BulletMarker>,
-    >,
-) {
-    let tick = timeline.tick();
-    // for (entity, transform) in player.iter() {
-    //     debug!(
-    //         ?tick,
-    //         ?entity,
-    //         pos = ?transform.translation.truncate(),
-    //         "Player after fixed update"
-    //     );
-    // }
-    // for (entity, position, transform, history) in predicted_bullet.iter() {
-    //     info!(
-    //         ?tick,
-    //         ?entity,
-    //         ?position,
-    //         transform = ?transform.translation.truncate(),
-    //         ?history,
-    //         "Bullet after fixed update"
-    //     );
-    // }
+//walls
+#[derive(Bundle)]
+pub struct WallBundle {
+    physics: PhysicsBundle,
+    wall: Wall,
+}
+
+#[derive(Component)]
+pub struct Wall {
+    pub start: Vec2,
+    pub end: Vec2,
+}
+
+impl WallBundle {
+    pub fn new(start: Vec2, end: Vec2) -> Self {
+        Self {
+            physics: PhysicsBundle {
+                collider: Collider::rectangle(100.0, 100.0),
+                collider_density: ColliderDensity(1.0),
+                rigid_body: RigidBody::Static,
+                restitution: Restitution::new(0.0),
+                constraint: LockedAxes::new().lock_rotation(),
+                dumping: LinearDamping(1.0),
+            },
+            wall: Wall {
+                start: start,
+                end: end,
+            },
+        }
+    }
+}
+
+pub fn init_walls(mut commands: Commands) {
+    info!("Walls spawned");
+    commands.spawn(WallBundle::new(
+        Vec2::new(-WALL_SIZE, -WALL_SIZE),
+        Vec2::new(-WALL_SIZE, WALL_SIZE),
+    ));
+    // commands.spawn(WallBundle::new(
+    //     Vec2::new(-WALL_SIZE, WALL_SIZE),
+    //     Vec2::new(WALL_SIZE, WALL_SIZE),
+    // ));
+    // commands.spawn(WallBundle::new(
+    //     Vec2::new(WALL_SIZE, WALL_SIZE),
+    //     Vec2::new(WALL_SIZE, -WALL_SIZE),
+    // ));
+    // commands.spawn(WallBundle::new(
+    //     Vec2::new(WALL_SIZE, -WALL_SIZE),
+    //     Vec2::new(-WALL_SIZE, -WALL_SIZE),
+    // ));
 }

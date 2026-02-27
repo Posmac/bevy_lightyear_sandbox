@@ -1,6 +1,7 @@
 use crate::{
     protocol::{
-        BotMarker, BulletMarker, Inputs, PlayerId, PlayerMarker, PlayerState, Score, WorldConfig,
+        BotMarker, BulletMarker, Inputs, PhysicsBundle, PlayerId, PlayerMarker, PlayerState, Score,
+        WorldConfig,
     },
     shared::{
         BULLET_COLLISION_DISTANCE_CHECK, PlayerAnimationTimer, PlayerSpriteSheetResource,
@@ -10,7 +11,8 @@ use crate::{
 };
 use aeronet_websocket::server::ServerConfig;
 use avian2d::prelude::{
-    Collider, LinearVelocity, PhysicsSchedule, Position, RigidBody, SpatialQueryFilter,
+    Collider, ColliderDensity, LinearDamping, LinearVelocity, LockedAxes, PhysicsSchedule,
+    Position, Restitution, RigidBody, SpatialQueryFilter,
 };
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::ActionState;
@@ -114,7 +116,7 @@ fn on_player_connected(
             DisableReplicateHierarchy,
             get_player_anim_config(),
             //
-            RigidBody::Kinematic,
+            PhysicsBundle::player(),
             //
             Replicate::to_clients(NetworkTarget::All),
             PredictionTarget::to_clients(NetworkTarget::Single(client_id)),
@@ -194,8 +196,16 @@ pub fn spawn_bots(mut commands: Commands) {
         BotMarker,
         Replicate::to_clients(NetworkTarget::All),
         InterpolationTarget::to_clients(NetworkTarget::All),
-        RigidBody::Kinematic,
-        Collider::circle(BOT_RADIUS),
+        PhysicsBundle {
+            // RigidBody::Kinematic,
+            // Collider::circle(BOT_RADIUS),
+            collider: Collider::circle(BOT_RADIUS),
+            collider_density: ColliderDensity(1.0),
+            rigid_body: RigidBody::Static,
+            restitution: Restitution::new(0.0),
+            constraint: LockedAxes::new().lock_rotation(),
+            dumping: LinearDamping(1.0),
+        },
         LagCompensationHistory::default(),
         Transform::from_xyz(200.0, 10.0, 0.0),
         GlobalTransform::default(),
@@ -241,41 +251,41 @@ pub fn compute_hit_lag_compensation(
                 false,
                 &mut SpatialQueryFilter::default(),
             ) {
-                info!(
-                    ?tick,
-                    ?hit_data,
-                    ?entity,
-                    "Collision with interpolated bot! Despawning bullet"
-                );
+                // info!(
+                //     ?tick,
+                //     ?hit_data,
+                //     ?entity,
+                //     "Collision with interpolated bot! Despawning bullet"
+                // );
 
-                let mut found = false;
+                // let mut found = false;
                 let bullet_owner_id = id.0; // ID из пули
                 for (mut score, p_id) in player_query.iter_mut() {
                     if p_id.0 == bullet_owner_id {
                         score.0 += 1;
-                        info!(
-                            "SUCCESS: Score increased for player {:?}. New score: {}",
-                            bullet_owner_id, score.0
-                        );
-                        found = true;
+                        // info!(
+                        //     "SUCCESS: Score increased for player {:?}. New score: {}",
+                        //     bullet_owner_id, score.0
+                        // );
+                        // found = true;
                         break;
-                    } else {
-                        // Этот лог скажет тебе, какие ID вообще есть в мире
-                        info!(
-                            "DEBUG: Skipping player with ID {:?} (bullet was from {:?})",
-                            p_id.0, bullet_owner_id
-                        );
+                        // } else {
+                        //     // Этот лог скажет тебе, какие ID вообще есть в мире
+                        //     info!(
+                        //         "DEBUG: Skipping player with ID {:?} (bullet was from {:?})",
+                        //         p_id.0, bullet_owner_id
+                        //     );
                     }
                 }
 
-                if !found {
-                    warn!(
-                        "ERROR: Hit confirmed, but NO PLAYER found with ID {:?} in query!",
-                        bullet_owner_id
-                    );
-                    // Проверим, а есть ли вообще игроки в этом квери
-                    info!("Total players in query: {}", player_query.iter().count());
-                }
+                // if !found {
+                //     warn!(
+                //         "ERROR: Hit confirmed, but NO PLAYER found with ID {:?} in query!",
+                //         bullet_owner_id
+                //     );
+                //     // Проверим, а есть ли вообще игроки в этом квери
+                //     info!("Total players in query: {}", player_query.iter().count());
+                // }
 
                 // if there is a hit, increment the score
                 // player_query

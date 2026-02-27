@@ -1,14 +1,18 @@
+use avian2d::dynamics::solver::xpbd::XpbdConstraint;
 use avian2d::prelude::*;
 use bevy::ecs::entity::{EntityMapper, MapEntities};
 use bevy::prelude::{Deref, DerefMut};
 use bevy::transform::components::Transform;
 use bevy::{app::Plugin, ecs::component::Component, reflect::Reflect};
+use bevy_ecs::bundle::Bundle;
 use leafwing_input_manager::Actionlike;
 use lightyear::input::config::InputConfig;
 use lightyear::prelude::input::leafwing::InputPlugin;
 use lightyear::prelude::*;
 
 use serde::{Deserialize, Serialize};
+
+use crate::shared::{BOT_RADIUS, PLAYER_SIZE};
 
 pub struct ProtocolPlugin;
 
@@ -19,6 +23,7 @@ impl Plugin for ProtocolPlugin {
         app.add_plugins(InputPlugin::<Inputs> {
             config: InputConfig::<Inputs> {
                 lag_compensation: true,
+                rebroadcast_inputs: true,
                 ..Default::default()
             },
         });
@@ -27,13 +32,24 @@ impl Plugin for ProtocolPlugin {
         app.register_component::<Position>()
             .add_prediction()
             .add_linear_interpolation()
-            .enable_correction();
+            .add_should_rollback(position_should_rollback)
+            .enable_correction()
+            .add_linear_correction_fn();
+
         app.register_component::<Rotation>()
             .add_prediction()
             .add_linear_interpolation()
-            .enable_correction();
-        app.register_component::<RigidBody>();
-        // app.register_component::<Transform>();
+            .add_should_rollback(rotation_should_rollback)
+            .enable_correction()
+            .add_linear_correction_fn();
+
+        // app.register_component::<RigidBody>();
+
+        // NOTE: interpolation/correction is only needed for components that are visually displayed!
+        // we still need prediction to be able to correctly predict the physics on the client
+        app.register_component::<LinearVelocity>().add_prediction();
+
+        app.register_component::<AngularVelocity>().add_prediction();
 
         //other params
         app.register_component::<PlayerState>();
@@ -239,3 +255,34 @@ pub struct PlayerMarker;
 
 #[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
 pub struct BotMarker;
+
+fn position_should_rollback(this: &Position, that: &Position) -> bool {
+    (this.0 - that.0).length() >= 0.01
+}
+
+fn rotation_should_rollback(this: &Rotation, that: &Rotation) -> bool {
+    this.angle_between(*that) >= 0.01
+}
+
+#[derive(Bundle)]
+pub struct PhysicsBundle {
+    pub collider: Collider,
+    pub collider_density: ColliderDensity,
+    pub rigid_body: RigidBody,
+    pub restitution: Restitution,
+    pub constraint: LockedAxes,
+    pub dumping: LinearDamping,
+}
+
+impl PhysicsBundle {
+    pub(crate) fn player() -> Self {
+        Self {
+            collider: Collider::rectangle(PLAYER_SIZE, PLAYER_SIZE),
+            collider_density: ColliderDensity(1.0),
+            rigid_body: RigidBody::Dynamic,
+            restitution: Restitution::new(0.0),
+            constraint: LockedAxes::new().lock_rotation(),
+            dumping: LinearDamping(1.0),
+        }
+    }
+}
