@@ -243,6 +243,6 @@ fn add_interpolated_bot_visuals(
 
 fn draw_walls(mut gizmos: Gizmos, walls: Query<&Wall, ()>) {
     for wall in &walls {
-        gizmos.line_2d(wall.start, wall.end, BLUE);
+        gizmos.rect_2d(Isometry2d::from_translation(wall.position), wall.size, BLUE);
     }
 }

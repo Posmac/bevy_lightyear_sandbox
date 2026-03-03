@@ -266,26 +266,33 @@ fn rotation_should_rollback(this: &Rotation, that: &Rotation) -> bool {
 }
 
 #[derive(Bundle)]
-pub struct PhysicsBundle {
+pub struct StaticPhysicsBundle {
+    pub collider: Collider,
+    pub collider_density: ColliderDensity,
+    pub rigid_body: RigidBody,
+}
+
+#[derive(Bundle)]
+pub struct PlayerPhysicsBundle {
     pub collider: Collider,
     pub collider_density: ColliderDensity,
     pub rigid_body: RigidBody,
     pub restitution: Restitution,
     pub constraint: LockedAxes,
     pub dumping: LinearDamping,
-    pub lag_history: LagCompensationHistory,
+    pub swept: SweptCcd,
 }
 
-impl PhysicsBundle {
-    pub(crate) fn player() -> Self {
+impl PlayerPhysicsBundle {
+    pub fn player() -> Self {
         Self {
             collider: Collider::rectangle(PLAYER_SIZE, PLAYER_SIZE),
             collider_density: ColliderDensity(1.0),
             rigid_body: RigidBody::Dynamic,
             restitution: Restitution::new(0.0),
             constraint: LockedAxes::new().lock_rotation(),
-            dumping: LinearDamping(1.0),
-            lag_history: LagCompensationHistory::default(),
+            dumping: LinearDamping(10.0),
+            swept: SweptCcd::default(),
         }
     }
 }

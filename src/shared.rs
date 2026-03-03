@@ -8,11 +8,12 @@ use std::{
 use aeronet_websocket::rustls::quic::DirectionalKeys;
 use avian2d::{
     PhysicsPlugins,
+    dynamics::solver::islands::PhysicsIslands,
     math::FRAC_PI_2,
     prelude::{
-        Collider, ColliderDensity, Gravity, LinearDamping, LinearVelocity, LockedAxes,
-        PhysicsInterpolationPlugin, PhysicsTransformPlugin, Position, Restitution, RigidBody,
-        Rotation,
+        Collider, ColliderDensity, Gravity, IslandPlugin, LinearDamping, LinearVelocity,
+        LockedAxes, PhysicsInterpolationPlugin, PhysicsTransformPlugin, Position, Restitution,
+        RigidBody, Rotation, SweptCcd,
     },
 };
 use bevy::prelude::*;
@@ -25,15 +26,14 @@ use lightyear::{
         Predicted, PredictionHistory, PredictionTarget, Replicate, Replicated,
     },
 };
-use lightyear_avian2d::prelude::LagCompensationHistory;
 use noise::{
     Fbm, Perlin,
     utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder},
 };
 
 use crate::protocol::{
-    AnimationConfig, BulletMarker, Inputs, PhysicsBundle, PlayerAnimations, PlayerId, PlayerMarker,
-    PlayerState, PlayerStateEnum, ProtocolPlugin,
+    AnimationConfig, BulletMarker, Inputs, PlayerAnimations, PlayerId, PlayerMarker, PlayerState,
+    PlayerStateEnum, ProtocolPlugin, StaticPhysicsBundle,
 };
 
 pub const FIXED_TIMESTEP_HZ: f64 = 64.0;
@@ -56,7 +56,7 @@ pub const BULLET_SIZE: f32 = 3.0;
 pub const PLAYER_SIZE: f32 = 80.0;
 pub const BULLET_COLLISION_DISTANCE_CHECK: f32 = 4.0;
 pub const BOT_RADIUS: f32 = 15.0;
-pub const WALL_SIZE: f32 = 350.0;
+pub const WALL_SIZE: f32 = 100.0;
 
 #[derive(Copy, Clone, Debug)]
 pub struct SharedSettings {
@@ -90,6 +90,7 @@ impl Plugin for SharedPlugin {
         app.add_plugins(
             PhysicsPlugins::default()
                 .build()
+                .disable::<IslandPlugin>()
                 .disable::<PhysicsTransformPlugin>()
                 .disable::<PhysicsInterpolationPlugin>(),
         )
@@ -170,7 +171,7 @@ pub fn shared_movement_behaviour(
     // } else {
     // }
     const MAX_VELOCITY: f32 = 200.0;
-    *velocity = LinearVelocity(Vec2::ZERO);
+    // *velocity = LinearVelocity(Vec2::ZERO);
 
     if action.pressed(&Inputs::Up) {
         // position.y += MOVE_SPEED;
@@ -188,7 +189,7 @@ pub fn shared_movement_behaviour(
         // position.x += MOVE_SPEED;
         velocity.x += MOVE_SPEED;
     }
-    // *velocity = LinearVelocity(velocity.clamp_length_max(MAX_VELOCITY));
+    *velocity = LinearVelocity(velocity.clamp_length_max(MAX_VELOCITY));
 }
 
 pub fn shared_animation_behaviour(
@@ -720,32 +721,30 @@ pub fn fill_tilemap_render(
 //walls
 #[derive(Bundle)]
 pub struct WallBundle {
-    physics: PhysicsBundle,
+    physics: StaticPhysicsBundle,
     wall: Wall,
+    transform: Transform,
 }
 
 #[derive(Component)]
 pub struct Wall {
-    pub start: Vec2,
-    pub end: Vec2,
+    pub position: Vec2,
+    pub size: Vec2,
 }
 
 impl WallBundle {
-    pub fn new(start: Vec2, end: Vec2) -> Self {
+    pub fn new(center_pos: Vec2, size: Vec2) -> Self {
         Self {
-            physics: PhysicsBundle {
-                collider: Collider::rectangle(100.0, 100.0),
+            physics: StaticPhysicsBundle {
+                collider: Collider::rectangle(size.x, size.y),
                 collider_density: ColliderDensity(1.0),
                 rigid_body: RigidBody::Static,
-                restitution: Restitution::new(0.0),
-                constraint: LockedAxes::new().lock_rotation(),
-                dumping: LinearDamping(1.0),
-                lag_history: LagCompensationHistory::default(),
             },
             wall: Wall {
-                start: start,
-                end: end,
+                position: center_pos,
+                size: size,
             },
+            transform: Transform::from_xyz(center_pos.x, center_pos.y, 0.0),
         }
     }
 }
@@ -753,19 +752,23 @@ impl WallBundle {
 pub fn init_walls(mut commands: Commands) {
     info!("Walls spawned");
     commands.spawn(WallBundle::new(
-        Vec2::new(-WALL_SIZE, -WALL_SIZE),
-        Vec2::new(-WALL_SIZE, WALL_SIZE),
+        Vec2 {
+            x: WALL_SIZE * 2.0,
+            y: WALL_SIZE * 2.0,
+        },
+        Vec2 {
+            x: WALL_SIZE,
+            y: WALL_SIZE,
+        },
     ));
-    // commands.spawn(WallBundle::new(
-    //     Vec2::new(-WALL_SIZE, WALL_SIZE),
-    //     Vec2::new(WALL_SIZE, WALL_SIZE),
-    // ));
-    // commands.spawn(WallBundle::new(
-    //     Vec2::new(WALL_SIZE, WALL_SIZE),
-    //     Vec2::new(WALL_SIZE, -WALL_SIZE),
-    // ));
-    // commands.spawn(WallBundle::new(
-    //     Vec2::new(WALL_SIZE, -WALL_SIZE),
-    //     Vec2::new(-WALL_SIZE, -WALL_SIZE),
-    // ));
+    commands.spawn(WallBundle::new(
+        Vec2 {
+            x: -WALL_SIZE * 2.0,
+            y: -WALL_SIZE * 2.0,
+        },
+        Vec2 {
+            x: WALL_SIZE,
+            y: WALL_SIZE,
+        },
+    ));
 }

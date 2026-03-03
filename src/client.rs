@@ -154,7 +154,7 @@ fn handle_predicted_spawn(
             Transform::default(),
             GlobalTransform::default(),
             InheritedVisibility::default(),
-            PhysicsBundle::player(),
+            PlayerPhysicsBundle::player(),
         ));
 
         commands.entity(entity).with_children(|parent| {
