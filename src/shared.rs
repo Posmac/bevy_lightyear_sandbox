@@ -5,15 +5,13 @@ use std::{
     time::Duration,
 };
 
-use aeronet_websocket::rustls::quic::DirectionalKeys;
 use avian2d::{
     PhysicsPlugins,
-    dynamics::solver::islands::PhysicsIslands,
     math::FRAC_PI_2,
     prelude::{
-        Collider, ColliderDensity, Gravity, IslandPlugin, LinearDamping, LinearVelocity,
-        LockedAxes, PhysicsInterpolationPlugin, PhysicsTransformPlugin, Position, Restitution,
-        RigidBody, Rotation, SweptCcd,
+        Collider, ColliderDensity, CollisionLayers, Gravity, IslandPlugin, IslandSleepingPlugin,
+        LinearDamping, LinearVelocity, LockedAxes, PhysicsInterpolationPlugin, PhysicsLayer,
+        PhysicsTransformPlugin, Position, Restitution, RigidBody, Rotation, SweptCcd,
     },
 };
 use bevy::prelude::*;
@@ -32,8 +30,8 @@ use noise::{
 };
 
 use crate::protocol::{
-    AnimationConfig, BulletMarker, Inputs, PlayerAnimations, PlayerId, PlayerMarker, PlayerState,
-    PlayerStateEnum, ProtocolPlugin, StaticPhysicsBundle,
+    AnimationConfig, BulletMarker, HitboxMarker, Inputs, PlayerAnimations, PlayerId, PlayerMarker,
+    PlayerState, PlayerStateEnum, ProtocolPlugin, StaticPhysicsBundle,
 };
 
 pub const FIXED_TIMESTEP_HZ: f64 = 64.0;
@@ -74,7 +72,8 @@ impl Plugin for SharedPlugin {
         app.add_plugins(ProtocolPlugin);
 
         app.add_plugins(LightyearAvianPlugin {
-            replication_mode: AvianReplicationMode::PositionButInterpolateTransform,
+            replication_mode: AvianReplicationMode::Transform,
+            rollback_islands: false,
             ..Default::default()
         });
 
@@ -84,19 +83,64 @@ impl Plugin for SharedPlugin {
 
         app.add_systems(
             FixedUpdate,
-            (player_movement, player_animation, shoot_bullet).chain(),
+            (
+                player_movement,
+                // debug_player_hierarchy,
+                player_animation,
+                shoot_bullet,
+            )
+                .chain(),
         );
 
         app.add_plugins(
             PhysicsPlugins::default()
                 .build()
                 .disable::<IslandPlugin>()
+                .disable::<IslandSleepingPlugin>()
                 .disable::<PhysicsTransformPlugin>()
                 .disable::<PhysicsInterpolationPlugin>(),
         )
         .insert_resource(Gravity(Vec2::ZERO));
 
         app.add_systems(Startup, load_resources);
+    }
+}
+
+#[derive(PhysicsLayer, Default)]
+pub enum GameLayer {
+    #[default]
+    World,
+    Player,
+    Hitbox,
+    Projectile,
+}
+
+fn debug_player_hierarchy(
+    q_parent: Query<
+        (Entity, &Position, &Transform, &GlobalTransform, &Children),
+        With<PlayerMarker>,
+    >,
+    q_child: Query<(Entity, Option<&Position>, &Transform, &GlobalTransform), With<HitboxMarker>>,
+) {
+    for (p_entity, p_pos, p_trans, p_global, children) in q_parent.iter() {
+        info!("=== PLAYER (Parent) ===");
+        info!("Entity: {:?}", p_entity);
+        info!("Avian Position: {:?}", p_pos.0);
+        info!("Bevy Transform: {:?}", p_trans.translation);
+        info!("World GlobalTransform: {:?}", p_global.translation());
+
+        for child_entity in children.iter() {
+            if let Ok((c_entity, c_pos, c_trans, c_global)) = q_child.get(child_entity) {
+                info!("--- HITBOX (Child) ---");
+                info!("Entity: {:?}", c_entity);
+                info!("Has Position Component: {}", c_pos.is_some());
+                if let Some(pos) = c_pos {
+                    info!("Child Avian Position: {:?}", pos.0);
+                }
+                info!("Local Transform: {:?}", c_trans.translation);
+                info!("World GlobalTransform: {:?}", c_global.translation());
+            }
+        }
     }
 }
 
@@ -739,6 +783,7 @@ impl WallBundle {
                 collider: Collider::rectangle(size.x, size.y),
                 collider_density: ColliderDensity(1.0),
                 rigid_body: RigidBody::Static,
+                layers: CollisionLayers::new(GameLayer::World, GameLayer::Player),
             },
             wall: Wall {
                 position: center_pos,

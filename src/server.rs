@@ -1,10 +1,10 @@
 use crate::{
     protocol::{
-        BotMarker, BulletMarker, Inputs, PlayerId, PlayerMarker, PlayerPhysicsBundle, PlayerState,
-        Score, StaticPhysicsBundle, WorldConfig,
+        BotMarker, BulletMarker, HitboxMarker, Inputs, PlayerId, PlayerMarker, PlayerPhysicsBundle,
+        PlayerState, Score, StaticPhysicsBundle, WorldConfig,
     },
     shared::{
-        BULLET_COLLISION_DISTANCE_CHECK, PLAYER_SIZE, PlayerAnimationTimer,
+        BULLET_COLLISION_DISTANCE_CHECK, GameLayer, PLAYER_SIZE, PlayerAnimationTimer,
         PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_ADDR, SHARED_SETTINGS,
         get_player_anim_config, shared_world_generator,
     },
@@ -128,6 +128,18 @@ fn on_player_connected(
         ))
         .with_children(|parent| {
             parent.spawn((
+                // hitbox
+                HitboxMarker::default(),
+                GlobalTransform::default(),
+                InheritedVisibility::default(),
+                Transform::default(),
+                Position::default(),
+                Collider::rectangle(PLAYER_SIZE * 1.2, PLAYER_SIZE * 1.2),
+                Sensor,
+                LagCompensationHistory::default(),
+                CollisionLayers::new(GameLayer::Hitbox, GameLayer::Projectile),
+            ));
+            parent.spawn((
                 //visuals
                 InheritedVisibility::default(),
                 Transform::from_scale(Vec3::splat(6.0)),
@@ -140,21 +152,12 @@ fn on_player_connected(
                 ),
                 PlayerAnimationTimer::new(2),
             ));
-            // parent.spawn((
-            //     //hitbox
-            //     InheritedVisibility::default(),
-            //     Position::default(),
-            //     // Transform::default(),
-            //     Collider::rectangle(PLAYER_SIZE + 0.1, PLAYER_SIZE + 0.1),
-            //     Sensor,
-            //     LagCompensationHistory::default(),
-            // ));
         })
         .id();
 
-    commands
-        .entity(entity)
-        .insert(LagCompensationHistory::default());
+    // commands
+    //     .entity(entity)
+    //     .insert(LagCompensationHistory::default());
 
     info!(
         "Created player entity {:?} for client {:?}",
@@ -210,6 +213,7 @@ pub fn spawn_bots(mut commands: Commands) {
             collider: Collider::circle(BOT_RADIUS),
             collider_density: ColliderDensity(1.0),
             rigid_body: RigidBody::Static,
+            layers: CollisionLayers::new(GameLayer::World, GameLayer::Projectile),
         },
         Transform::from_xyz(200.0, 10.0, 0.0),
         GlobalTransform::default(),

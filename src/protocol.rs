@@ -13,7 +13,7 @@ use lightyear::prelude::*;
 use lightyear_avian2d::prelude::LagCompensationHistory;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::{BOT_RADIUS, PLAYER_SIZE};
+use crate::shared::{BOT_RADIUS, GameLayer, PLAYER_SIZE};
 
 pub struct ProtocolPlugin;
 
@@ -24,7 +24,7 @@ impl Plugin for ProtocolPlugin {
         app.add_plugins(InputPlugin::<Inputs> {
             config: InputConfig::<Inputs> {
                 lag_compensation: true,
-                rebroadcast_inputs: true,
+                // rebroadcast_inputs: true,
                 ..Default::default()
             },
         });
@@ -65,6 +65,9 @@ impl Plugin for ProtocolPlugin {
 
         //bots
         app.register_component::<BotMarker>();
+
+        //hits
+        app.register_component::<HitboxMarker>();
     }
 }
 
@@ -270,6 +273,7 @@ pub struct StaticPhysicsBundle {
     pub collider: Collider,
     pub collider_density: ColliderDensity,
     pub rigid_body: RigidBody,
+    pub layers: CollisionLayers,
 }
 
 #[derive(Bundle)]
@@ -281,6 +285,7 @@ pub struct PlayerPhysicsBundle {
     pub constraint: LockedAxes,
     pub dumping: LinearDamping,
     pub swept: SweptCcd,
+    pub layers: CollisionLayers,
 }
 
 impl PlayerPhysicsBundle {
@@ -293,6 +298,10 @@ impl PlayerPhysicsBundle {
             constraint: LockedAxes::new().lock_rotation(),
             dumping: LinearDamping(10.0),
             swept: SweptCcd::default(),
+            layers: CollisionLayers::new(GameLayer::Player, GameLayer::World),
         }
     }
 }
+
+#[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect, Default)]
+pub struct HitboxMarker;
