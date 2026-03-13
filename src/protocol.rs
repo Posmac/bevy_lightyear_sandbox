@@ -1,8 +1,6 @@
-use avian2d::dynamics::solver::xpbd::XpbdConstraint;
 use avian2d::prelude::*;
 use bevy::ecs::entity::{EntityMapper, MapEntities};
 use bevy::prelude::{Deref, DerefMut};
-use bevy::transform::components::Transform;
 use bevy::{app::Plugin, ecs::component::Component, reflect::Reflect};
 use bevy_ecs::bundle::Bundle;
 use leafwing_input_manager::Actionlike;
@@ -13,7 +11,7 @@ use lightyear::prelude::*;
 use lightyear_avian2d::prelude::LagCompensationHistory;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::{BOT_RADIUS, GameLayer, PLAYER_SIZE};
+use crate::shared::constants::{GameLayer, PLAYER_SIZE};
 
 pub struct ProtocolPlugin;
 

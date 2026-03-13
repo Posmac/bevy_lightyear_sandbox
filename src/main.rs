@@ -5,12 +5,10 @@ use bevy::{prelude::*, window::PresentMode};
 use clap::{Parser, Subcommand};
 use lightyear::prelude::{client::ClientPlugins, server::ServerPlugins, *};
 
-pub mod shared;
-
 use crate::client::GameClientPlugin;
 use crate::render::GameRendererPlugin;
 use crate::server::GameServerPlugin;
-use crate::shared::{FIXED_TIMESTEP_HZ, SharedPlugin};
+use crate::shared::constants::{FIXED_TIMESTEP_HZ, SharedPlugin};
 
 // #[cfg(feature = "client")]
 pub mod client;

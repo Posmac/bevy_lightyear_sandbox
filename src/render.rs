@@ -1,10 +1,9 @@
 use crate::{
     client::ClientId,
     protocol::*,
-    shared::{BOT_RADIUS, BULLET_SIZE, PlayerAnimationTimer, Wall},
+    shared::constants::{BOT_RADIUS, BULLET_SIZE, PlayerAnimationTimer, Wall},
 };
-use aeronet_websocket::client::ClientConfig;
-use avian2d::prelude::{ColliderAabb, PhysicsDebugPlugin, Position, Rotation};
+use avian2d::prelude::{PhysicsDebugPlugin, Position, Rotation};
 use bevy::{
     color::palettes::css::{BLUE, GREEN},
     prelude::*,
@@ -16,7 +15,6 @@ use lightyear::{
     frame_interpolation::{FrameInterpolate, FrameInterpolationPlugin},
     prelude::{Interpolated, InterpolationSystems, Replicated, RollbackSystems},
 };
-use lightyear_avian2d::prelude::AabbEnvelopeHolder;
 
 #[derive(Clone)]
 pub struct GameRendererPlugin;

@@ -4,9 +4,12 @@ use crate::{
         PlayerState, Score, StaticPhysicsBundle, WorldConfig,
     },
     shared::{
-        BULLET_COLLISION_DISTANCE_CHECK, GameLayer, PLAYER_SIZE, PlayerAnimationTimer,
-        PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_ADDR, SHARED_SETTINGS,
-        get_player_anim_config, shared_world_generator,
+        constants::{
+            BULLET_COLLISION_DISTANCE_CHECK, GameLayer, PLAYER_SIZE, PlayerAnimationTimer,
+            PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_ADDR, SHARED_SETTINGS,
+            get_player_anim_config,
+        },
+        world_generator::shared_world_generator,
     },
 };
 use aeronet_websocket::server::ServerConfig;

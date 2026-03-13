@@ -1,3 +1,32 @@
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    time::Duration,
+};
+
+use avian2d::{
+    PhysicsPlugins,
+    math::FRAC_PI_2,
+    prelude::{
+        Collider, ColliderDensity, CollisionLayers, Gravity, IslandPlugin, IslandSleepingPlugin,
+        LinearVelocity, PhysicsInterpolationPlugin, PhysicsLayer, PhysicsTransformPlugin, Position,
+        RigidBody, Rotation,
+    },
+};
+use bevy::prelude::*;
+use leafwing_input_manager::prelude::ActionState;
+use lightyear::{
+    avian2d::plugin::{AvianReplicationMode, LightyearAvianPlugin},
+    prelude::{
+        ControlledBy, InterpolationTarget, LocalTimeline, NetworkTarget, PreSpawned, Predicted,
+        PredictionTarget, Replicate,
+    },
+};
+
+use crate::protocol::{
+    AnimationConfig, BulletMarker, HitboxMarker, Inputs, PlayerAnimations, PlayerId, PlayerMarker,
+    PlayerState, PlayerStateEnum, ProtocolPlugin, StaticPhysicsBundle,
+};
+
 pub const FIXED_TIMESTEP_HZ: f64 = 64.0;
 pub const SERVER_PORT: u16 = 5888;
 /// 0 means that the OS will assign any available port
@@ -19,42 +48,6 @@ pub const PLAYER_SIZE: f32 = 80.0;
 pub const BULLET_COLLISION_DISTANCE_CHECK: f32 = 4.0;
 pub const BOT_RADIUS: f32 = 15.0;
 pub const WALL_SIZE: f32 = 100.0;
-
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::LazyLock,
-    time::Duration,
-};
-
-use avian2d::{
-    PhysicsPlugins,
-    math::FRAC_PI_2,
-    prelude::{
-        Collider, ColliderDensity, CollisionLayers, Gravity, IslandPlugin, IslandSleepingPlugin,
-        LinearDamping, LinearVelocity, LockedAxes, PhysicsInterpolationPlugin, PhysicsLayer,
-        PhysicsTransformPlugin, Position, Restitution, RigidBody, Rotation, SweptCcd,
-    },
-};
-use bevy::prelude::*;
-use bevy_ecs_tilemap::prelude::*;
-use leafwing_input_manager::prelude::ActionState;
-use lightyear::{
-    avian2d::plugin::{AvianReplicationMode, LightyearAvianPlugin},
-    prelude::{
-        ControlledBy, Interpolated, InterpolationTarget, LocalTimeline, NetworkTarget, PreSpawned,
-        Predicted, PredictionHistory, PredictionTarget, Replicate, Replicated,
-    },
-};
-use noise::{
-    Fbm, Perlin,
-    utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder},
-};
-
-use crate::protocol::{
-    AnimationConfig, BulletMarker, HitboxMarker, Inputs, PlayerAnimations, PlayerId, PlayerMarker,
-    PlayerState, PlayerStateEnum, ProtocolPlugin, StaticPhysicsBundle,
-};
 
 #[derive(Copy, Clone, Debug)]
 pub struct SharedSettings {
