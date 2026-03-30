@@ -3,6 +3,7 @@ use bevy::ecs::entity::{EntityMapper, MapEntities};
 use bevy::prelude::{Deref, DerefMut};
 use bevy::{app::Plugin, ecs::component::Component, reflect::Reflect};
 use bevy_ecs::bundle::Bundle;
+use bevy_ecs::entity::Entity;
 use leafwing_input_manager::Actionlike;
 use lightyear::input::config::InputConfig;
 use lightyear::prelude::input::leafwing::InputPlugin;
@@ -11,7 +12,7 @@ use lightyear::prelude::*;
 use lightyear_avian2d::prelude::LagCompensationHistory;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::constants::{GameLayer, PLAYER_SIZE};
+use crate::shared::constants::{GamePhysicsLayer, PLAYER_SIZE};
 
 pub struct ProtocolPlugin;
 
@@ -47,8 +48,8 @@ impl Plugin for ProtocolPlugin {
         // NOTE: interpolation/correction is only needed for components that are visually displayed!
         // we still need prediction to be able to correctly predict the physics on the client
         app.register_component::<LinearVelocity>().add_prediction();
-
         app.register_component::<AngularVelocity>().add_prediction();
+        // app.register_component::<RigidBody>();
 
         //other params
         app.register_component::<PlayerState>();
@@ -250,7 +251,9 @@ pub struct Score(pub usize);
 pub struct PlayerId(pub PeerId);
 
 #[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
-pub struct BulletMarker;
+pub struct BulletMarker {
+    pub player_entity: Entity,
+}
 
 #[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
 pub struct PlayerMarker;
@@ -296,7 +299,10 @@ impl PlayerPhysicsBundle {
             constraint: LockedAxes::new().lock_rotation(),
             dumping: LinearDamping(10.0),
             swept: SweptCcd::default(),
-            layers: CollisionLayers::new(GameLayer::Player, GameLayer::World),
+            layers: CollisionLayers::new(
+                GamePhysicsLayer::PlayerRigidBody,
+                GamePhysicsLayer::WorldStatic,
+            ),
         }
     }
 }

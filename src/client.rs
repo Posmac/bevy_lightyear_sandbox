@@ -6,8 +6,10 @@ use crate::shared::constants::SERVER_ADDR;
 use crate::shared::constants::SHARED_SETTINGS;
 use crate::shared::world_generator::shared_world_generator;
 use aeronet_websocket::client::ClientConfig;
+use avian2d::prelude::LinearVelocity;
 use avian2d::prelude::Position;
 use avian2d::prelude::Rotation;
+use bevy::color::palettes::css::GREEN;
 use bevy::prelude::*;
 use leafwing_input_manager::plugin::InputManagerSystem;
 use leafwing_input_manager::prelude::ActionState;
@@ -45,9 +47,34 @@ impl Plugin for GameClientPlugin {
         // app.add_systems(FixedUpdate, local_player_animation);
         // app.add_systems(Update, debug_sync);
         app.add_systems(PostUpdate, camera_follow);
+        app.add_systems(Update, debug_bullets_system);
         app.add_observer(handle_predicted_spawn);
         app.add_observer(handle_interpolated_spawn);
         app.add_observer(handle_world_config_spawn);
+    }
+}
+
+pub fn debug_bullets_system(
+    query: Query<(Entity, &Position, &LinearVelocity, &Transform), With<BulletMarker>>,
+    mut gizmos: Gizmos,
+) {
+    for (entity, pos, vel, transform) in query.iter() {
+        // 1. Рисуем вектор скорости (зеленый)
+        gizmos.ray_2d(pos.0, vel.0 * 0.1, GREEN);
+
+        // 2. Рисуем маленькую сферу в месте нахождения Трансформа (белая)
+        // Если белая сфера и позиция Avian расходятся — у нас проблема синхронизации
+        gizmos.circle_2d(transform.translation.truncate(), 2.0, Color::WHITE);
+
+        // 3. Вывод в лог (аккуратно, чтобы не засрать консоль)
+        // Мы будем видеть, меняются ли цифры у "чужих" пуль
+        println!(
+            "Bullet {:?} | Pos: {:?} | Vel: {:?} | Speed: {}",
+            entity,
+            pos.0,
+            vel.0,
+            vel.0.length()
+        );
     }
 }
 

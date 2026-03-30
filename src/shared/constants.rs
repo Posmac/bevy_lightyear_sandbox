@@ -21,6 +21,7 @@ use lightyear::{
         PredictionTarget, Replicate,
     },
 };
+use lightyear_avian2d::prelude::LagCompensationHistory;
 
 use crate::protocol::{
     AnimationConfig, BulletMarker, HitboxMarker, Inputs, PlayerAnimations, PlayerId, PlayerMarker,
@@ -100,12 +101,20 @@ impl Plugin for SharedPlugin {
 }
 
 #[derive(PhysicsLayer, Default)]
-pub enum GameLayer {
+pub enum GamePhysicsLayer {
+    //none
     #[default]
-    World,
-    Player,
-    Hitbox,
-    Projectile,
+    None,
+    //player rigidboddy collider
+    PlayerRigidBody,
+    //player hitbox collider
+    PlayerHitbox,
+    //player projectile
+    PlayerProjectile,
+    //World object (other rigid bodies, non action)
+    WorldStatic,
+    //Bot collider
+    Bot,
 }
 
 fn debug_player_hierarchy(
@@ -277,6 +286,7 @@ pub fn shoot_bullet(
     mut commands: Commands,
     mut query: Query<
         (
+            Entity,
             &PlayerId,
             &Position,
             &mut ActionState<Inputs>,
@@ -286,7 +296,7 @@ pub fn shoot_bullet(
     >,
 ) {
     let tick = timeline.tick();
-    for (id, position, action, controlled_by) in query.iter_mut() {
+    for (player_entity, player_id, position, action, controlled_by) in query.iter_mut() {
         let is_server = controlled_by.is_some();
         // NOTE: pressed lets you shoot many bullets, which can be cool
         let cursor_pos = action.axis_pair(&Inputs::Mouse);
@@ -306,10 +316,13 @@ pub fn shoot_bullet(
                     bullet_transform,
                     LinearVelocity(bullet_transform.up().as_vec3().truncate() * BULLET_MOVE_SPEED),
                     RigidBody::Kinematic,
-                    // store the player who fired the bullet
-                    *id,
-                    // *color,
-                    BulletMarker,
+                    BulletMarker {
+                        player_entity: player_entity,
+                    },
+                    // CollisionLayers::new(
+                    //     GamePhysicsLayer::PlayerProjectile,
+                    // [GamePhysicsLayer::WorldStatic, GamePhysicsLayer::Bot],
+                    // ),
                     Name::new("Bullet"),
                 );
 
@@ -329,10 +342,12 @@ pub fn shoot_bullet(
                         // NOTE: if you don't add the salt, the 'left' bullet on the server might get matched with the
                         // 'right' bullet on the client, and vice versa. This is not critical, but it will cause a rollback
                         PreSpawned::default_with_salt(salt),
-                        DespawnAfter(Timer::new(Duration::from_secs(2), TimerMode::Once)),
+                        DespawnAfter(Timer::new(Duration::from_secs(5), TimerMode::Once)),
                         Replicate::to_clients(NetworkTarget::All),
-                        PredictionTarget::to_clients(NetworkTarget::Single(id.0)),
-                        InterpolationTarget::to_clients(NetworkTarget::AllExceptSingle(id.0)),
+                        PredictionTarget::to_clients(NetworkTarget::Single(player_id.0)),
+                        InterpolationTarget::to_clients(NetworkTarget::AllExceptSingle(
+                            player_id.0,
+                        )),
                         controlled_by.unwrap().clone(),
                     ));
                 } else {
@@ -423,6 +438,7 @@ pub struct WallBundle {
     physics: StaticPhysicsBundle,
     wall: Wall,
     transform: Transform,
+    lag_compensation: LagCompensationHistory,
 }
 
 #[derive(Component)]
@@ -438,13 +454,17 @@ impl WallBundle {
                 collider: Collider::rectangle(size.x, size.y),
                 collider_density: ColliderDensity(1.0),
                 rigid_body: RigidBody::Static,
-                layers: CollisionLayers::new(GameLayer::World, GameLayer::Player),
+                layers: CollisionLayers::new(
+                    GamePhysicsLayer::WorldStatic,
+                    GamePhysicsLayer::PlayerRigidBody,
+                ),
             },
             wall: Wall {
                 position: center_pos,
                 size: size,
             },
             transform: Transform::from_xyz(center_pos.x, center_pos.y, 0.0),
+            lag_compensation: LagCompensationHistory::default(),
         }
         // let mut app = App::new();
         // app.add_plugins(DefaultPlugins.

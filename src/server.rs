@@ -5,7 +5,7 @@ use crate::{
     },
     shared::{
         constants::{
-            BULLET_COLLISION_DISTANCE_CHECK, GameLayer, PLAYER_SIZE, PlayerAnimationTimer,
+            BULLET_COLLISION_DISTANCE_CHECK, GamePhysicsLayer, PLAYER_SIZE, PlayerAnimationTimer,
             PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_ADDR, SHARED_SETTINGS,
             get_player_anim_config,
         },
@@ -14,7 +14,11 @@ use crate::{
 };
 use aeronet_websocket::server::ServerConfig;
 use avian2d::prelude::*;
-use bevy::prelude::*;
+use bevy::{
+    color::palettes::css::{BLUE, RED},
+    prelude::*,
+};
+use bevy_ecs::entity::EntityHashSet;
 use leafwing_input_manager::prelude::ActionState;
 use lightyear_avian2d::prelude::{
     LagCompensationHistory, LagCompensationPlugin, LagCompensationSpatialQuery,
@@ -39,6 +43,7 @@ impl Plugin for GameServerPlugin {
         app.add_observer(on_player_link);
         app.add_observer(on_player_connected);
         app.add_observer(on_seed_generated);
+
         // the lag compensation systems need to run after LagCompensationSet::UpdateHistory
         // app.add_systems(FixedUpdate, interpolated_bot_movement);
         app.add_systems(
@@ -46,6 +51,7 @@ impl Plugin for GameServerPlugin {
             // lag compensation collisions must run after the SpatialQuery has been updated
             compute_hit_lag_compensation.in_set(LagCompensationSystems::Collisions),
         );
+
         // app.add_systems(
         //     FixedPostUpdate,
         //     // check collisions after physics have run
@@ -140,7 +146,10 @@ fn on_player_connected(
                 Collider::rectangle(PLAYER_SIZE * 1.2, PLAYER_SIZE * 1.2),
                 Sensor,
                 LagCompensationHistory::default(),
-                CollisionLayers::new(GameLayer::Hitbox, GameLayer::Projectile),
+                CollisionLayers::new(
+                    GamePhysicsLayer::PlayerHitbox,
+                    GamePhysicsLayer::PlayerProjectile,
+                ),
             ));
             parent.spawn((
                 //visuals
@@ -216,12 +225,13 @@ pub fn spawn_bots(mut commands: Commands) {
             collider: Collider::circle(BOT_RADIUS),
             collider_density: ColliderDensity(1.0),
             rigid_body: RigidBody::Static,
-            layers: CollisionLayers::new(GameLayer::World, GameLayer::Projectile),
+            layers: CollisionLayers::new(GamePhysicsLayer::Bot, GamePhysicsLayer::PlayerProjectile),
         },
         Transform::from_xyz(200.0, 10.0, 0.0),
         GlobalTransform::default(),
         InheritedVisibility::default(),
         DisableReplicateHierarchy,
+        LagCompensationHistory::default(),
     ));
 }
 
@@ -232,123 +242,126 @@ pub fn compute_hit_lag_compensation(
     // was seen by the client when they fired the shot)
     mut commands: Commands,
     timeline: Res<LocalTimeline>,
+    time: Res<Time<Fixed>>,
     query: LagCompensationSpatialQuery,
     bullets: Query<
-        (Entity, &PlayerId, &Position, &LinearVelocity, &ControlledBy),
+        (
+            Entity,
+            &BulletMarker,
+            &Position,
+            &LinearVelocity,
+            &ControlledBy,
+        ),
         With<BulletMarker>,
     >,
     // the InterpolationDelay component is stored directly on the client entity
     // (the server creates one entity for each client to store client-specific
     // metadata)
     client_query: Query<&InterpolationDelay, With<ClientOf>>,
-    mut player_query: Query<(&mut Score, &PlayerId), With<PlayerMarker>>,
+    mut player_query: Query<(&mut Score, Entity, &PlayerId), With<PlayerMarker>>,
+    query_children: Query<&Children>,
+    mut gizmos: Gizmos,
 ) {
     let tick = timeline.tick();
+
     bullets
         .iter()
-        .for_each(|(entity, id, position, velocity, controlled_by)| {
+        .for_each(|(entity, bullet, position, velocity, controlled_by)| {
             let Ok(delay) = client_query.get(controlled_by.owner) else {
-                error!("Could not retrieve InterpolationDelay for client {id:?}");
+                error!(
+                    "Could not retrieve InterpolationDelay for client {:?}",
+                    bullet.player_entity
+                );
                 return;
             };
+
+            let mut excluded_entities = SpatialQueryFilter::default().with_mask([
+                GamePhysicsLayer::WorldStatic,
+                GamePhysicsLayer::Bot,
+                GamePhysicsLayer::PlayerHitbox,
+            ]);
+            // .with_excluded_entities([entity, bullet.player_entity]);
+
+            gizmos.ray_2d(
+                position.0,
+                position.0 + Vec2::new(velocity.x, velocity.y) * 100.0,
+                RED,
+            );
+
             if let Some(hit_data) = query.cast_ray(
-                // the delay is sent in every input message; the latest InterpolationDelay received
-                // is stored on the client entity
                 *delay,
                 position.0,
                 Dir2::new_unchecked(velocity.0.normalize()),
-                // TODO: shouldn't this be based on velocity length?
-                BULLET_COLLISION_DISTANCE_CHECK,
+                velocity.length() * time.delta_secs(),
                 false,
-                &mut SpatialQueryFilter::default(),
+                &mut excluded_entities,
             ) {
-                // info!(
-                //     ?tick,
-                //     ?hit_data,
-                //     ?entity,
-                //     "Collision with interpolated bot! Despawning bullet"
-                // );
+                // println!("Hit data: {:?}", hit_data);
 
-                // let mut found = false;
-                let bullet_owner_id = id.0; // ID из пули
-                for (mut score, p_id) in player_query.iter_mut() {
-                    if p_id.0 == bullet_owner_id {
+                let is_self_hit = hit_data.entity == bullet.player_entity
+                    || query_children
+                        .get(bullet.player_entity)
+                        .map_or(false, |p| p.contains(&hit_data.entity));
+
+                if is_self_hit {
+                    // println!("Self hit!");
+                    return;
+                }
+
+                println!("Not self hit, {}", hit_data.entity);
+
+                let bullet_owner_id = bullet.player_entity; // ID из пули
+                for (mut score, e, p_id) in player_query.iter_mut() {
+                    if e == bullet_owner_id {
                         score.0 += 1;
-                        // info!(
-                        //     "SUCCESS: Score increased for player {:?}. New score: {}",
-                        //     bullet_owner_id, score.0
-                        // );
-                        // found = true;
                         break;
-                        // } else {
-                        //     // Этот лог скажет тебе, какие ID вообще есть в мире
-                        //     info!(
-                        //         "DEBUG: Skipping player with ID {:?} (bullet was from {:?})",
-                        //         p_id.0, bullet_owner_id
-                        //     );
                     }
                 }
 
-                // if !found {
-                //     warn!(
-                //         "ERROR: Hit confirmed, but NO PLAYER found with ID {:?} in query!",
-                //         bullet_owner_id
-                //     );
-                //     // Проверим, а есть ли вообще игроки в этом квери
-                //     info!("Total players in query: {}", player_query.iter().count());
-                // }
-
-                // if there is a hit, increment the score
-                // player_query
-                //     .iter_mut()
-                //     .find(|(_, player_id)| player_id.0 == id.0)
-                //     .map(|(mut score, _)| {
-                //         score.0 += 1;
-                //     });
                 commands.entity(entity).despawn();
             }
         })
 }
 
-// pub(crate) fn compute_hit_prediction(
-//     mut commands: Commands,
-//     timeline: Res<LocalTimeline>,
-//     query: SpatialQuery,
-//     bullets: Query<(Entity, &PlayerId, &Position, &LinearVelocity), With<BulletMarker>>,
-//     // bot_query: Query<(), With<PredictedBot>>,
-//     // the InterpolationDelay component is stored directly on the client entity
-//     // (the server creates one entity for each client to store client-specific
-//     // metadata)
-//     mut player_query: Query<(&mut Score, &PlayerId), With<PlayerMarker>>,
-// ) {
-//     let tick = timeline.tick();
-//     bullets.iter().for_each(|(entity, id, position, velocity)| {
-//         if let Some(hit_data) = query.cast_ray_predicate(
-//             position.0,
-//             Dir2::new_unchecked(velocity.0.normalize()),
-//             // TODO: shouldn't this be based on velocity length?
-//             BULLET_COLLISION_DISTANCE_CHECK,
-//             false,
-//             &SpatialQueryFilter::default(),
-//             &|entity| {
-//                 // only confirm the hit on predicted bots
-//                 bot_query.get(entity).is_ok()
-//             },
-//         ) {
-//             info!(
-//                 ?tick,
-//                 ?hit_data,
-//                 ?entity,
-//                 "Collision with predicted bot! Despawn bullet"
-//             );
-//             // if there is a hit, increment the score
-//             player_query
-//                 .iter_mut()
-//                 .find(|(_, player_id)| player_id.0 == id.0)
-//                 .map(|(mut score, _)| {
-//                     score.0 += 1;
-//                 });
-//             commands.entity(entity).despawn();
-//         }
-//     })
-// }
+pub(crate) fn compute_hit_prediction(
+    mut commands: Commands,
+    timeline: Res<LocalTimeline>,
+    query: SpatialQuery,
+    bullets: Query<(Entity, &PlayerId, &Position, &LinearVelocity), With<BulletMarker>>,
+    bot_query: Query<(), With<BotMarker>>,
+    // the InterpolationDelay component is stored directly on the client entity
+    // (the server creates one entity for each client to store client-specific
+    // metadata)
+    mut player_query: Query<(&mut Score, &PlayerId), With<PlayerMarker>>,
+) {
+    let tick = timeline.tick();
+    bullets.iter().for_each(|(entity, id, position, velocity)| {
+        if let Some(hit_data) = query.cast_ray_predicate(
+            position.0,
+            Dir2::new_unchecked(velocity.0.normalize()),
+            // TODO: shouldn't this be based on velocity length?
+            BULLET_COLLISION_DISTANCE_CHECK,
+            false,
+            &SpatialQueryFilter::default(),
+            &|entity| {
+                // only confirm the hit on predicted bots
+                bot_query.get(entity).is_ok()
+            },
+        ) {
+            info!(
+                ?tick,
+                ?hit_data,
+                ?entity,
+                "Collision with predicted bot! Despawn bullet"
+            );
+            // if there is a hit, increment the score
+            player_query
+                .iter_mut()
+                .find(|(_, player_id)| player_id.0 == id.0)
+                .map(|(mut score, _)| {
+                    score.0 += 1;
+                });
+            commands.entity(entity).despawn();
+        }
+    })
+}

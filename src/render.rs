@@ -3,7 +3,7 @@ use crate::{
     protocol::*,
     shared::constants::{BOT_RADIUS, BULLET_SIZE, PlayerAnimationTimer, Wall},
 };
-use avian2d::prelude::{PhysicsDebugPlugin, Position, Rotation};
+use avian2d::prelude::{ColliderAabb, PhysicsDebugPlugin, Position, RigidBody, Rotation};
 use bevy::{
     color::palettes::css::{BLUE, GREEN},
     prelude::*,
@@ -15,6 +15,7 @@ use lightyear::{
     frame_interpolation::{FrameInterpolate, FrameInterpolationPlugin},
     prelude::{Interpolated, InterpolationSystems, Replicated, RollbackSystems},
 };
+use lightyear_avian2d::prelude::AabbEnvelopeHolder;
 
 #[derive(Clone)]
 pub struct GameRendererPlugin;
@@ -93,15 +94,46 @@ fn init(mut commands: Commands) {
     }
 }
 
+// fn add_bullet_visuals(
+//     trigger: On<Add, BulletMarker>,
+//     query: Query<Has<Interpolated>>,
+//     mut commands: Commands,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     mut materials: ResMut<Assets<ColorMaterial>>,
+// ) {
+//     if let Ok(interpolated) = query.get(trigger.entity) {
+//         commands.entity(trigger.entity).insert((
+//             Visibility::default(),
+//             Mesh2d(meshes.add(Mesh::from(Circle {
+//                 radius: BULLET_SIZE,
+//             }))),
+//             MeshMaterial2d(materials.add(ColorMaterial {
+//                 color: Color::WHITE,
+//                 ..Default::default()
+//             })),
+//             RigidBody::Kinematic,
+//         ));
+//         if interpolated {
+//             commands.entity(trigger.entity).insert((
+//                 FrameInterpolate::<Position>::default(),
+//                 FrameInterpolate::<Rotation>::default(),
+//             ));
+//         }
+//     }
+// }
+
 fn add_bullet_visuals(
     trigger: On<Add, BulletMarker>,
-    query: Query<Has<Interpolated>>,
+    query: Query<(&Position, Has<Interpolated>)>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    if let Ok(interpolated) = query.get(trigger.entity) {
+    if let Ok((pos, interpolated)) = query.get(trigger.entity) {
         commands.entity(trigger.entity).insert((
+            // Создаем Transform сразу в нужной позиции,
+            // иначе один кадр пуля будет в 0,0,0
+            Transform::from_translation(pos.0.extend(0.1)),
             Visibility::default(),
             Mesh2d(meshes.add(Mesh::from(Circle {
                 radius: BULLET_SIZE,
@@ -110,7 +142,9 @@ fn add_bullet_visuals(
                 color: Color::WHITE,
                 ..Default::default()
             })),
+            RigidBody::Kinematic,
         ));
+
         if interpolated {
             commands.entity(trigger.entity).insert((
                 FrameInterpolate::<Position>::default(),
