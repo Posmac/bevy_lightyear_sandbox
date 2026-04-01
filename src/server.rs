@@ -14,7 +14,7 @@ use crate::{
         constants::{
             BOT_RADIUS, BULLET_COLLISION_DISTANCE_CHECK, GamePhysicsLayer, ITEM_PICKUP_BOX_RADIUS,
             ITEM_RADIUS, PLAYER_MAX_HEALTH, PLAYER_SIZE, PlayerAnimationTimer,
-            PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_IP, SERVER_PORT, SHARED_SETTINGS,
+            PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_PORT, SHARED_SETTINGS,
             get_player_anim_config,
         },
         world_generator::shared_world_generator,
@@ -242,16 +242,17 @@ fn on_player_connected(
 pub fn start_server(mut commands: Commands) {
     info!("Server created");
 
-    let sans = vec![
-        // SERVER_IP.to_string(),
-        "localhost".to_string(),
-        "127.0.0.1".to_string(),
-        "::1".to_string(),
-    ];
+    // let sans = vec![
+    //     // SERVER_IP.to_string(),
+    //     "localhost".to_string(),
+    //     "127.0.0.1".to_string(),
+    //     "::1".to_string(),
+    // ];
 
     let config = ServerConfig::builder()
         .with_bind_address(SERVER_ADDR)
-        .with_identity(lightyear::websocket::server::Identity::self_signed(sans).unwrap());
+        .with_no_encryption();
+    // .with_identity(lightyear::websocket::server::Identity::self_signed(sans).unwrap());
     // let config = ServerConfig::builder().;
     // .with_bind_address(SERVER_ADDR)
     // .with_no_encryption();

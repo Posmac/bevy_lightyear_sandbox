@@ -8,7 +8,7 @@ use crate::shared::constants::LOCAL_ADDR;
 use crate::shared::constants::PlayerAnimationTimer;
 use crate::shared::constants::PlayerSpriteSheetResource;
 use crate::shared::constants::SERVER_ADDR;
-use crate::shared::constants::SERVER_IP;
+// use crate::shared::constants::SERVER_IP;
 use crate::shared::constants::SERVER_PORT;
 use crate::shared::constants::SHARED_SETTINGS;
 use crate::shared::world_generator::shared_world_generator;
@@ -115,7 +115,7 @@ fn update_cursor_state_from_window(
         }
     }
 }
-pub const SERVER_PUBLIC_URL: &str = "wss://9s8jnimyd2ef.share.zrok.io ";
+
 pub fn startup(mut commands: Commands, config: Res<ClientId>) {
     let auth = Authentication::Manual {
         client_id: config.client_id,
@@ -123,9 +123,10 @@ pub fn startup(mut commands: Commands, config: Res<ClientId>) {
         protocol_id: SHARED_SETTINGS.protocol_id,
         private_key: SHARED_SETTINGS.private_key,
     };
+
+    let server_url = "wss://droplets.it.com/ws";
     let config = { ClientConfig::default() };
 
-    // ClientConfig::builder().with_no_cert_validation(),
     let client = commands
         .spawn((
             Client::default(),
@@ -133,7 +134,7 @@ pub fn startup(mut commands: Commands, config: Res<ClientId>) {
             // UdpIo::default(),
             WebSocketClientIo {
                 config,
-                target: WebSocketTarget::Url(SERVER_PUBLIC_URL.to_string()),
+                target: WebSocketTarget::Url(server_url.to_string()),
             },
             LocalAddr(LOCAL_ADDR), // обязательно
             PeerAddr(SERVER_ADDR), // сервер

@@ -28,7 +28,7 @@ use crate::protocol::{
     PlayerState, PlayerStateEnum, ProtocolPlugin, StaticPhysicsBundle,
 };
 
-pub const SERVER_IP: &str = "qlz17q4rvb9f.share.zrok.io";
+// pub const SERVER_IP: &str = "droplets.it.com";
 pub const FIXED_TIMESTEP_HZ: f64 = 64.0;
 pub const SERVER_PORT: u16 = 5888;
 /// 0 means that the OS will assign any available port
