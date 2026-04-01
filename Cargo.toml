@@ -12,14 +12,28 @@ default = [
 client = []
 server = []
 world_generator = []
+dev = ["dep:bevy-inspector-egui"]
 
 [dependencies]
-bevy = { version = "0.18", default-features = true, features = ["2d"] }
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_core_pipeline",
+    "bevy_render",
+    "bevy_sprite_render",
+    "bevy_sprite",      # Спрайты
+    "bevy_ui",          # Интерфейс
+    "bevy_asset",       # Загрузка ресурсов
+    "bevy_winit",       # Окно
+    "multi_threaded",   # Параллелизм
+    "png",              # Поддержка картинок
+    "x11",              # Для Linux (на Mac/Win игнорируется)
+    "webgl2"
+] }
 bevy_ecs = "0.18"
-bevy-inspector-egui = "0.36.0"
+bevy_ecs_macros = "0.18"
 bevy_ecs_tilemap = "0.18.1"
+bevy-inspector-egui = { version = "0.36", optional = true }
 
-lightyear ={ version = "0.26.4", features = [
+lightyear ={ version = "0.26.4", default-features = false, features = [
   "client",
   "server",
   "netcode",
@@ -37,7 +51,6 @@ lightyear_avian2d = {version = "0.26.4", features = ["2d", "lag_compensation"]}
 
 avian2d = { version = "0.5.0", features = [
   "2d",
-  "debug-plugin",
   "f32",
   "parry-f32",
   "parallel",
@@ -45,8 +58,25 @@ avian2d = { version = "0.5.0", features = [
 ] }
 
 leafwing-input-manager = "0.20"
-aeronet_websocket = { version = "0.19.1" }
+aeronet_websocket = { version = "0.19.1", features = ["client", "server"] }
 serde = "1.0.228"
 clap = { version = "4.5.59", features = ["derive"] }
 rand = "0.10.0"
 noise = "0.9"
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+# Для самых новых версий (0.4.x), которые у тебя сейчас вылетели
+getrandom = { version = "0.4", features = ["wasm_js"] }
+
+# Для версий 0.3.x (на случай если они есть в других либах)
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+# Для старых версий 0.2.x (которые часто тянет Bevy или Lightyear)
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+
+
+# [profile.release]
+# opt-level = "z"      # Оптимизация по размеру (иногда "s" работает лучше, надо тестить)
+# lto = true           # Link Time Optimization — ВАЖНО, выкидывает неиспользуемый код из всех зависимостей
+# codegen-units = 1    # Дает LTO больше шансов всё вычистить
+# panic = "abort"      # Выкидывает логику размотки стека (огромный кусок кода)
+# strip = true         # Вырезает все символы (debug info)

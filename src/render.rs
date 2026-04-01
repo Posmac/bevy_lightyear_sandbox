@@ -1,11 +1,14 @@
 use crate::{
-    client::ClientId,
+    // client::ClientId,
     protocol::*,
-    shared::constants::{BOT_RADIUS, BULLET_SIZE, PlayerAnimationTimer, Wall},
+    shared::constants::{
+        BOT_RADIUS, BULLET_SIZE, HEALTH_BAR_SIZE, ITEM_RADIUS, PLAYER_SIZE, PlayerAnimationTimer,
+        Wall,
+    },
 };
 use avian2d::prelude::{ColliderAabb, PhysicsDebugPlugin, Position, RigidBody, Rotation};
 use bevy::{
-    color::palettes::css::{BLUE, GREEN},
+    color::palettes::css::{BLUE, GREEN, RED},
     prelude::*,
 };
 use bevy_ecs_tilemap::prelude::TilemapPlugin;
@@ -40,9 +43,13 @@ impl Plugin for GameRendererPlugin {
                 .after(InterpolationSystems::Interpolate)
                 .after(RollbackSystems::VisualCorrection),
         );
+        app.add_systems(PostUpdate, check_net_pos);
 
+        app.add_systems(Update, update_health_bar);
+        app.add_observer(add_health_bar_visuals);
         app.add_observer(add_bullet_visuals);
-        app.add_observer(add_interpolated_bot_visuals);
+        // app.add_observer(add_interpolated_bot_visuals);
+        // app.add_observer(add_interpolated_item_visuals);
     }
 }
 
@@ -121,6 +128,53 @@ fn init(mut commands: Commands) {
 //         }
 //     }
 // }
+
+pub fn add_health_bar_visuals(
+    trigger: On<Add, HealthComponent>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    commands.entity(trigger.entity).with_children(|parent| {
+        parent.spawn((
+            Mesh2d(meshes.add(Rectangle::from_size(HEALTH_BAR_SIZE))),
+            MeshMaterial2d(materials.add(Color::BLACK)),
+            Transform::from_xyz(0.0, PLAYER_SIZE * 1.05, 1.0),
+        ));
+
+        parent.spawn((
+            HealthBarMarker,
+            Mesh2d(meshes.add(Rectangle::from_size(HEALTH_BAR_SIZE))),
+            MeshMaterial2d(materials.add(ColorMaterial {
+                color: Color::Srgba(Srgba {
+                    red: 0.0,
+                    green: 1.0,
+                    blue: 0.0,
+                    alpha: 1.0,
+                }),
+                ..Default::default()
+            })),
+            Transform::from_xyz(0.0, PLAYER_SIZE * 1.05, 1.1),
+        ));
+    });
+}
+
+pub fn update_health_bar(
+    mut health_bar_query: Query<(&mut Transform, &ChildOf), With<HealthBarMarker>>,
+    parent_query: Query<&HealthComponent>,
+) {
+    for (mut transform, parent) in health_bar_query.iter_mut() {
+        if let Ok(health) = parent_query.get(parent.0) {
+            let health_pct = health.current_health as f32 / health.max_health as f32;
+            let health_pct = health_pct.clamp(0.0, 1.0);
+
+            transform.scale.x = health_pct;
+
+            let offset = (1.0 - health_pct) * (HEALTH_BAR_SIZE.x / 2.0);
+            transform.translation.x = -offset;
+        }
+    }
+}
 
 fn add_bullet_visuals(
     trigger: On<Add, BulletMarker>,
@@ -242,36 +296,79 @@ fn play_animation(
 }
 
 /// Add visuals to newly spawned bots
-fn add_interpolated_bot_visuals(
-    trigger: On<Add, BotMarker>,
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-    client_id: Option<Res<ClientId>>,
-) {
-    let entity = trigger.entity;
-    if client_id.is_some() {
-        commands.entity(entity).insert((
-            Transform::from_xyz(200.0, 10.0, 0.0),
-            GlobalTransform::default(),
-            InheritedVisibility::default(),
-        ));
-    }
+// fn add_interpolated_bot_visuals(
+//     trigger: On<Add, BotMarker>,
+//     mut commands: Commands,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     mut materials: ResMut<Assets<ColorMaterial>>,
+//     client_id: Option<Res<ClientId>>,
+// ) {
+//     let entity = trigger.entity;
+//     if client_id.is_some() {
+//         commands.entity(entity).insert((
+//             Transform::from_xyz(200.0, 10.0, 0.0),
+//             GlobalTransform::default(),
+//             InheritedVisibility::default(),
+//         ));
+//     }
 
-    // add visibility
-    commands.entity(entity).with_children(|parent| {
-        parent.spawn((
-            Mesh2d(meshes.add(Mesh::from(Circle { radius: BOT_RADIUS }))),
-            MeshMaterial2d(materials.add(ColorMaterial {
-                color: GREEN.into(),
-                ..Default::default()
-            })),
-            Transform::default(),
-            GlobalTransform::default(),
-            InheritedVisibility::default(),
-        ));
-    });
+//     // add visibility
+//     commands.entity(entity).with_children(|parent| {
+//         parent.spawn((
+//             Mesh2d(meshes.add(Mesh::from(Circle { radius: BOT_RADIUS }))),
+//             MeshMaterial2d(materials.add(ColorMaterial {
+//                 color: GREEN.into(),
+//                 ..Default::default()
+//             })),
+//             Transform::default(),
+//             GlobalTransform::default(),
+//             InheritedVisibility::default(),
+//         ));
+//     });
+// }
+
+fn check_net_pos(q: Query<&Position, With<ItemMarker>>) {
+    // for p in q.iter() {
+    //     println!("Network Position: {:?}", p.0);
+    // }
 }
+
+// pub fn add_interpolated_item_visuals(
+//     trigger: On<Add, ItemMarker>,
+//     mut commands: Commands,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     mut materials: ResMut<Assets<ColorMaterial>>,
+//     client_id: Option<Res<ClientId>>,
+//     query: Query<&Position, With<ItemMarker>>,
+// ) {
+//     let entity = trigger.entity;
+//     let initial_pos = query.get(entity).map(|p| p.0).unwrap_or(Vec2::ZERO);
+
+//     info!("Client: Visual spawned for item at {:?}", initial_pos);
+//     if client_id.is_some() {
+//         commands.entity(entity).insert((
+//             Transform::from_xyz(initial_pos.x, initial_pos.y, 0.0),
+//             GlobalTransform::default(),
+//             InheritedVisibility::default(),
+//         ));
+//     }
+
+//     // add visibility
+//     commands.entity(entity).with_children(|parent| {
+//         parent.spawn((
+//             Mesh2d(meshes.add(Mesh::from(Circle {
+//                 radius: ITEM_RADIUS,
+//             }))),
+//             MeshMaterial2d(materials.add(ColorMaterial {
+//                 color: RED.into(),
+//                 ..Default::default()
+//             })),
+//             Transform::default(),
+//             GlobalTransform::default(),
+//             InheritedVisibility::default(),
+//         ));
+//     });
+// }
 
 fn draw_walls(mut gizmos: Gizmos, walls: Query<&Wall, ()>) {
     for wall in &walls {

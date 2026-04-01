@@ -49,6 +49,7 @@ impl Plugin for ProtocolPlugin {
         // we still need prediction to be able to correctly predict the physics on the client
         app.register_component::<LinearVelocity>().add_prediction();
         app.register_component::<AngularVelocity>().add_prediction();
+        //no, because RigidBody is too hevy to be moved throunght network
         // app.register_component::<RigidBody>();
 
         //other params
@@ -67,6 +68,9 @@ impl Plugin for ProtocolPlugin {
 
         //hits
         app.register_component::<HitboxMarker>();
+        app.register_component::<HealthComponent>();
+        app.register_component::<ItemPickupBox>();
+        app.register_component::<ItemMarker>();
     }
 }
 
@@ -259,6 +263,16 @@ pub struct BulletMarker {
 pub struct PlayerMarker;
 
 #[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
+pub struct HealthComponent {
+    pub current_health: u16,
+    pub max_health: u16,
+    // pub root: Entity,
+}
+
+#[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
+pub struct HealthBarMarker;
+
+#[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
 pub struct BotMarker;
 
 fn position_should_rollback(this: &Position, that: &Position) -> bool {
@@ -307,5 +321,16 @@ impl PlayerPhysicsBundle {
     }
 }
 
-#[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect, Default)]
-pub struct HitboxMarker;
+#[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
+pub struct HitboxMarker {
+    pub root: Entity,
+}
+
+#[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
+pub struct ItemPickupBox {
+    pub radius: f32,
+    pub root: Entity,
+}
+
+#[derive(Debug, Component, Serialize, Deserialize, Clone, Copy, PartialEq, Reflect)]
+pub struct ItemMarker;

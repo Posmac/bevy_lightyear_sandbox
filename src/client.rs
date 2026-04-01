@@ -1,8 +1,15 @@
+use std::net::IpAddr;
+use std::net::Ipv4Addr;
+use std::net::SocketAddr;
+use std::str::FromStr;
+
 use crate::protocol::*;
 use crate::shared::constants::LOCAL_ADDR;
 use crate::shared::constants::PlayerAnimationTimer;
 use crate::shared::constants::PlayerSpriteSheetResource;
 use crate::shared::constants::SERVER_ADDR;
+use crate::shared::constants::SERVER_IP;
+use crate::shared::constants::SERVER_PORT;
 use crate::shared::constants::SHARED_SETTINGS;
 use crate::shared::world_generator::shared_world_generator;
 use aeronet_websocket::client::ClientConfig;
@@ -47,7 +54,7 @@ impl Plugin for GameClientPlugin {
         // app.add_systems(FixedUpdate, local_player_animation);
         // app.add_systems(Update, debug_sync);
         app.add_systems(PostUpdate, camera_follow);
-        app.add_systems(Update, debug_bullets_system);
+        // app.add_systems(Update, debug_bullets_system);
         app.add_observer(handle_predicted_spawn);
         app.add_observer(handle_interpolated_spawn);
         app.add_observer(handle_world_config_spawn);
@@ -108,7 +115,7 @@ fn update_cursor_state_from_window(
         }
     }
 }
-
+pub const SERVER_PUBLIC_URL: &str = "wss://9s8jnimyd2ef.share.zrok.io ";
 pub fn startup(mut commands: Commands, config: Res<ClientId>) {
     let auth = Authentication::Manual {
         client_id: config.client_id,
@@ -116,16 +123,7 @@ pub fn startup(mut commands: Commands, config: Res<ClientId>) {
         protocol_id: SHARED_SETTINGS.protocol_id,
         private_key: SHARED_SETTINGS.private_key,
     };
-    let config = {
-        #[cfg(target_family = "wasm")]
-        {
-            ClientConfig::default()
-        }
-        #[cfg(not(target_family = "wasm"))]
-        {
-            ClientConfig::builder().with_no_cert_validation()
-        }
-    };
+    let config = { ClientConfig::default() };
 
     // ClientConfig::builder().with_no_cert_validation(),
     let client = commands
@@ -135,7 +133,7 @@ pub fn startup(mut commands: Commands, config: Res<ClientId>) {
             // UdpIo::default(),
             WebSocketClientIo {
                 config,
-                target: WebSocketTarget::Addr(Default::default()),
+                target: WebSocketTarget::Url(SERVER_PUBLIC_URL.to_string()),
             },
             LocalAddr(LOCAL_ADDR), // обязательно
             PeerAddr(SERVER_ADDR), // сервер

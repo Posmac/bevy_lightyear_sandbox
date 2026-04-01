@@ -28,6 +28,7 @@ use crate::protocol::{
     PlayerState, PlayerStateEnum, ProtocolPlugin, StaticPhysicsBundle,
 };
 
+pub const SERVER_IP: &str = "qlz17q4rvb9f.share.zrok.io";
 pub const FIXED_TIMESTEP_HZ: f64 = 64.0;
 pub const SERVER_PORT: u16 = 5888;
 /// 0 means that the OS will assign any available port
@@ -48,7 +49,16 @@ pub const BULLET_SIZE: f32 = 3.0;
 pub const PLAYER_SIZE: f32 = 80.0;
 pub const BULLET_COLLISION_DISTANCE_CHECK: f32 = 4.0;
 pub const BOT_RADIUS: f32 = 15.0;
+pub const ITEM_RADIUS: f32 = 10.0;
 pub const WALL_SIZE: f32 = 100.0;
+pub const ITEM_PICKUP_BOX_RADIUS: f32 = 80.0;
+
+//health
+pub const BOT_MAX_HEALTH: u16 = 255;
+pub const PLAYER_MAX_HEALTH: u16 = 100;
+pub const BULLET_BASE_DAMAGE: u16 = 22;
+pub const WALL_MAX_HEALTH: u16 = 1000;
+pub const HEALTH_BAR_SIZE: Vec2 = Vec2::new(100.0, 10.0);
 
 #[derive(Copy, Clone, Debug)]
 pub struct SharedSettings {
@@ -66,7 +76,7 @@ impl Plugin for SharedPlugin {
         app.add_plugins(ProtocolPlugin);
 
         app.add_plugins(LightyearAvianPlugin {
-            replication_mode: AvianReplicationMode::Transform,
+            replication_mode: AvianReplicationMode::Position,
             rollback_islands: false,
             ..Default::default()
         });
@@ -96,7 +106,7 @@ impl Plugin for SharedPlugin {
         )
         .insert_resource(Gravity(Vec2::ZERO));
 
-        app.add_systems(Startup, load_resources);
+        // app.add_systems(Startup, load_resources);
     }
 }
 
@@ -115,6 +125,10 @@ pub enum GamePhysicsLayer {
     WorldStatic,
     //Bot collider
     Bot,
+    //Items
+    Item,
+    //Itembox
+    ItemPickUpBox,
 }
 
 fn debug_player_hierarchy(

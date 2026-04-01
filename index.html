@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="utf-8" />
+  <title>S.T.A.L.K.E.R. TMA</title>
+
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
+    /* Убираем все системные отступы и прокрутку */
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      /* Фикс для мобильного Safari */
+      height: -webkit-fill-available;
+      overflow: hidden;
+      background-color: #000;
+      /* Защита от "резинового" скролла на iOS */
+      position: fixed;
+      /* Отключаем жесты браузера, чтобы не мешать игре */
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* Настройка канваса, в который Bevy рендерит игру */
+    canvas {
+      display: block;
+      width: 100vw !important;
+      height: 100vh !important;
+      outline: none;
+      /* Убираем синюю вспышку при клике на Android/iOS */
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    }
+
+    /* Центрируем лоадер */
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #555;
+      font-family: monospace;
+      z-index: -1;
+      /* Чтобы канвас Bevy лег сверху */
+    }
+  </style>
+</head>
+
+<body>
+  <div id="loading">ЗАГРУЗКА ЗОНЫ...</div>
+
+  <script>
+    // Используем опциональную цепочку и проверку, чтобы скрипт не падал
+    const webapp = window.Telegram.WebApp;
+
+    if (webapp) {
+      // Раскрываем окно на всю высоту
+      webapp.expand();
+
+      // Сообщаем ТГ, что приложение готово
+      webapp.ready();
+
+      // Отключаем вертикальные свайпы (защита от закрытия приложения)
+      if (typeof webapp.disableVerticalSwiping === 'function') {
+        webapp.disableVerticalSwiping();
+      }
+    }
+
+    // Лог для отладки в консоли браузера
+    window.addEventListener('load', () => {
+      console.log("DOM готов, Bevy начинает инициализацию...");
+    });
+  </script>
+</body>
+
+</html>

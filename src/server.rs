@@ -1,12 +1,20 @@
+use crate::shared::constants::SERVER_ADDR;
+use std::net::IpAddr;
+use std::net::Ipv4Addr;
+use std::net::SocketAddr;
+use std::str::FromStr;
+// #[cfg(not(target_arch = "wasm32"))]
 use crate::{
     protocol::{
-        BotMarker, BulletMarker, HitboxMarker, Inputs, PlayerId, PlayerMarker, PlayerPhysicsBundle,
-        PlayerState, Score, StaticPhysicsBundle, WorldConfig,
+        BotMarker, BulletMarker, HealthComponent, HitboxMarker, Inputs, ItemMarker, ItemPickupBox,
+        PlayerId, PlayerMarker, PlayerPhysicsBundle, PlayerState, Score, StaticPhysicsBundle,
+        WorldConfig,
     },
     shared::{
         constants::{
-            BULLET_COLLISION_DISTANCE_CHECK, GamePhysicsLayer, PLAYER_SIZE, PlayerAnimationTimer,
-            PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_ADDR, SHARED_SETTINGS,
+            BOT_RADIUS, BULLET_COLLISION_DISTANCE_CHECK, GamePhysicsLayer, ITEM_PICKUP_BOX_RADIUS,
+            ITEM_RADIUS, PLAYER_MAX_HEALTH, PLAYER_SIZE, PlayerAnimationTimer,
+            PlayerSpriteSheetResource, SEND_INTERVAL, SERVER_IP, SERVER_PORT, SHARED_SETTINGS,
             get_player_anim_config,
         },
         world_generator::shared_world_generator,
@@ -17,6 +25,7 @@ use avian2d::prelude::*;
 use bevy::{
     color::palettes::css::{BLUE, RED},
     prelude::*,
+    render::render_phase::SetItemPipeline,
 };
 use bevy_ecs::entity::EntityHashSet;
 use leafwing_input_manager::prelude::ActionState;
@@ -33,12 +42,43 @@ use lightyear::{
     },
 };
 
+pub trait SpawnItemExt {
+    fn spawn_item(&mut self);
+}
+
+impl<'w, 's> SpawnItemExt for Commands<'w, 's> {
+    fn spawn_item(&mut self) {
+        // let x_rand = rand::random::<i8>() as f32;
+        // let y_rand = rand::random::<i8>() as f32;
+
+        let transform = Transform::from_xyz(-200.0, 10.0, 0.0);
+        self.spawn((
+            ItemMarker,
+            Replicate::to_clients(NetworkTarget::All),
+            InterpolationTarget::to_clients(NetworkTarget::All),
+            Collider::circle(ITEM_RADIUS),
+            CollisionLayers::new(GamePhysicsLayer::Item, GamePhysicsLayer::ItemPickUpBox),
+            Sensor,
+            transform,
+            // Position::from_xy(x_rand, y_rand),
+            // Transform::from_xyz(-200.0, 10.0, 0.0),
+            GlobalTransform::default(),
+            InheritedVisibility::default(),
+            DisableReplicateHierarchy,
+            CollisionEventsEnabled,
+        ));
+    }
+}
+
 pub struct GameServerPlugin;
 
 impl Plugin for GameServerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(LagCompensationPlugin);
-        app.add_systems(Startup, (start_server, generate_seed, spawn_bots).chain());
+        app.add_systems(
+            Startup,
+            (start_server, generate_seed, spawn_bots, spawn_items).chain(),
+        );
         // app.add_systems(FixedUpdate, (movement, animation));
         app.add_observer(on_player_link);
         app.add_observer(on_player_connected);
@@ -49,8 +89,11 @@ impl Plugin for GameServerPlugin {
         app.add_systems(
             PhysicsSchedule,
             // lag compensation collisions must run after the SpatialQuery has been updated
-            compute_hit_lag_compensation.in_set(LagCompensationSystems::Collisions),
+            compute_hit_lag_compensation
+                // .after(item_pickup_system)
+                .in_set(LagCompensationSystems::Collisions),
         );
+        app.add_systems(Update, item_pickup_system);
 
         // app.add_systems(
         //     FixedPostUpdate,
@@ -136,40 +179,59 @@ fn on_player_connected(
             InheritedVisibility::default(),
         ))
         .with_children(|parent| {
-            parent.spawn((
-                // hitbox
-                HitboxMarker::default(),
-                GlobalTransform::default(),
-                InheritedVisibility::default(),
-                Transform::default(),
-                Position::default(),
-                Collider::rectangle(PLAYER_SIZE * 1.2, PLAYER_SIZE * 1.2),
-                Sensor,
-                LagCompensationHistory::default(),
-                CollisionLayers::new(
-                    GamePhysicsLayer::PlayerHitbox,
-                    GamePhysicsLayer::PlayerProjectile,
-                ),
-            ));
-            parent.spawn((
-                //visuals
-                InheritedVisibility::default(),
-                Transform::from_scale(Vec3::splat(6.0)),
-                Sprite::from_atlas_image(
-                    player_resources.player_image.clone(),
-                    TextureAtlas {
-                        layout: player_resources.atlas.clone(),
-                        index: 0,
-                    },
-                ),
-                PlayerAnimationTimer::new(2),
-            ));
+            // parent.spawn((
+            //     //visuals
+            //     InheritedVisibility::default(),
+            //     Transform::from_scale(Vec3::splat(6.0)),
+            //     Sprite::from_atlas_image(
+            //         player_resources.player_image.clone(),
+            //         TextureAtlas {
+            //             layout: player_resources.atlas.clone(),
+            //             index: 0,
+            //         },
+            //     ),
+            //     PlayerAnimationTimer::new(2),
+            // ));
         })
         .id();
 
-    // commands
-    //     .entity(entity)
-    //     .insert(LagCompensationHistory::default());
+    commands.entity(entity).with_children(|parent| {
+        parent.spawn((
+            HitboxMarker { root: entity },
+            GlobalTransform::default(),
+            InheritedVisibility::default(),
+            // Transform::default(),
+            // Position::default(),
+            Collider::rectangle(PLAYER_SIZE * 1.2, PLAYER_SIZE * 1.2),
+            Sensor,
+            LagCompensationHistory::default(),
+            CollisionLayers::new(
+                GamePhysicsLayer::PlayerHitbox,
+                GamePhysicsLayer::PlayerProjectile,
+            ),
+        ));
+
+        parent.spawn((
+            ItemPickupBox {
+                radius: ITEM_PICKUP_BOX_RADIUS,
+                root: entity,
+            },
+            GlobalTransform::default(),
+            InheritedVisibility::default(),
+            // Transform::default(),
+            // Position::default(),
+            Collider::circle(ITEM_PICKUP_BOX_RADIUS),
+            Sensor,
+            // LagCompensationHistory::default(),
+            CollisionLayers::new(GamePhysicsLayer::ItemPickUpBox, GamePhysicsLayer::Item),
+            // CollisionEventsEnabled,
+        ));
+    });
+
+    commands.entity(entity).insert(HealthComponent {
+        current_health: PLAYER_MAX_HEALTH,
+        max_health: PLAYER_MAX_HEALTH,
+    });
 
     info!(
         "Created player entity {:?} for client {:?}",
@@ -181,13 +243,19 @@ pub fn start_server(mut commands: Commands) {
     info!("Server created");
 
     let sans = vec![
+        // SERVER_IP.to_string(),
         "localhost".to_string(),
         "127.0.0.1".to_string(),
         "::1".to_string(),
     ];
+
     let config = ServerConfig::builder()
         .with_bind_address(SERVER_ADDR)
         .with_identity(lightyear::websocket::server::Identity::self_signed(sans).unwrap());
+    // let config = ServerConfig::builder().;
+    // .with_bind_address(SERVER_ADDR)
+    // .with_no_encryption();
+    // .with_identity(lightyear::websocket::server::Identity::self_signed(sans).unwrap());
 
     let server = commands
         .spawn((
@@ -196,6 +264,7 @@ pub fn start_server(mut commands: Commands) {
                 private_key: SHARED_SETTINGS.private_key,
                 ..Default::default()
             }),
+            // pub const SERVER_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), SERVER_PORT);
             LocalAddr(SERVER_ADDR),
             // ServerUdpIo::default(),
             WebSocketServerIo { config },
@@ -205,7 +274,7 @@ pub fn start_server(mut commands: Commands) {
 }
 
 pub fn generate_seed(mut commands: Commands) {
-    let seed: u32 = rand::random();
+    let seed: u32 = 10;
     let world_config = commands.spawn((
         WorldConfig {
             seed,
@@ -216,7 +285,6 @@ pub fn generate_seed(mut commands: Commands) {
 }
 
 pub fn spawn_bots(mut commands: Commands) {
-    static BOT_RADIUS: f32 = 15.0;
     commands.spawn((
         BotMarker,
         Replicate::to_clients(NetworkTarget::All),
@@ -235,15 +303,20 @@ pub fn spawn_bots(mut commands: Commands) {
     ));
 }
 
-/// Compute hits if the bullet hits the bot, and increment the score on the player
+pub fn spawn_items(mut commands: Commands) {
+    commands.spawn_item();
+}
+
 pub fn compute_hit_lag_compensation(
-    // instead of directly using avian's SpatialQuery, we want to use the LagCompensationSpatialQuery
-    // to apply lag-compensation (i.e. compute the collision between the bullet and the collider as it
-    // was seen by the client when they fired the shot)
+    //mut
     mut commands: Commands,
+    mut player_query: Query<(&mut Score, &mut HealthComponent), With<PlayerMarker>>,
+    //non mut
     timeline: Res<LocalTimeline>,
     time: Res<Time<Fixed>>,
     query: LagCompensationSpatialQuery,
+    hitbox_query: Query<&HitboxMarker>,
+    client_query: Query<&InterpolationDelay, With<ClientOf>>,
     bullets: Query<
         (
             Entity,
@@ -254,13 +327,7 @@ pub fn compute_hit_lag_compensation(
         ),
         With<BulletMarker>,
     >,
-    // the InterpolationDelay component is stored directly on the client entity
-    // (the server creates one entity for each client to store client-specific
-    // metadata)
-    client_query: Query<&InterpolationDelay, With<ClientOf>>,
-    mut player_query: Query<(&mut Score, Entity, &PlayerId), With<PlayerMarker>>,
-    query_children: Query<&Children>,
-    mut gizmos: Gizmos,
+    // mut gizmos: Gizmos,
 ) {
     let tick = timeline.tick();
 
@@ -280,13 +347,6 @@ pub fn compute_hit_lag_compensation(
                 GamePhysicsLayer::Bot,
                 GamePhysicsLayer::PlayerHitbox,
             ]);
-            // .with_excluded_entities([entity, bullet.player_entity]);
-
-            gizmos.ray_2d(
-                position.0,
-                position.0 + Vec2::new(velocity.x, velocity.y) * 100.0,
-                RED,
-            );
 
             if let Some(hit_data) = query.cast_ray(
                 *delay,
@@ -296,31 +356,59 @@ pub fn compute_hit_lag_compensation(
                 false,
                 &mut excluded_entities,
             ) {
-                // println!("Hit data: {:?}", hit_data);
+                if let Ok(hitbox) = hitbox_query.get(hit_data.entity) {
+                    if hitbox.root == bullet.player_entity {
+                        return;
+                    }
 
-                let is_self_hit = hit_data.entity == bullet.player_entity
-                    || query_children
-                        .get(bullet.player_entity)
-                        .map_or(false, |p| p.contains(&hit_data.entity));
+                    if let Ok((_, mut hp)) = player_query.get_mut(hitbox.root) {
+                        let r = hp.current_health.overflowing_sub(10);
 
-                if is_self_hit {
-                    // println!("Self hit!");
-                    return;
+                        if r.1 {
+                            panic!("Dead!");
+                        }
+                        hp.current_health = r.0;
+                    }
                 }
 
-                println!("Not self hit, {}", hit_data.entity);
-
-                let bullet_owner_id = bullet.player_entity; // ID из пули
-                for (mut score, e, p_id) in player_query.iter_mut() {
-                    if e == bullet_owner_id {
-                        score.0 += 1;
-                        break;
-                    }
+                if let Ok((mut score, _)) = player_query.get_mut(bullet.player_entity) {
+                    score.0 += 1;
                 }
 
                 commands.entity(entity).despawn();
             }
         })
+}
+
+pub fn item_pickup_system(
+    mut commands: Commands,
+    mut collisions: MessageReader<CollisionStart>,
+    mut player_query: Query<&mut Score, With<PlayerMarker>>,
+    item_query: Query<Entity, With<ItemMarker>>,
+    pickup_box_query: Query<&ItemPickupBox>,
+) {
+    for event in collisions.read() {
+        println!(
+            "{} and {} started colliding",
+            event.collider1, event.collider2
+        );
+
+        if let Ok(item) = item_query.get(event.collider1)
+            && let Ok(pickup_box) = pickup_box_query.get(event.collider2)
+            && let Ok(mut score) = player_query.get_mut(pickup_box.root)
+        {
+            commands.entity(item).despawn();
+            commands.spawn_item();
+            score.0 += 1;
+        } else if let Ok(item) = item_query.get(event.collider1)
+            && let Ok(pickup_box) = pickup_box_query.get(event.collider2)
+            && let Ok(mut score) = player_query.get_mut(pickup_box.root)
+        {
+            commands.entity(item).despawn();
+            commands.spawn_item();
+            score.0 += 1;
+        }
+    }
 }
 
 pub(crate) fn compute_hit_prediction(
