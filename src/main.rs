@@ -48,98 +48,36 @@ fn main() {
 
     println!("HUI");
 
-    // #[cfg(feature = "server")]
+    #[cfg(feature = "server")]
     {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins.set(ScheduleRunnerPlugin::run_loop(
             Duration::from_secs_f64(1.0 / 60.0), // Серверный тик 60 FPS
         )));
 
-        // app.add_plugins(
-        //     bevy_app::PanicHandlerPlugin,
-        //     bevy::log::LogPlugin::default(),
-        //     bevy_app::TaskPoolPlugin,
-        //     bevy_diagnostic::FrameCountPlugin,
-        //     bevy_time::TimePlugin,
-        //     bevy_transform::TransformPlugin,
-        //     bevy_diagnostic::DiagnosticsPlugin,
-        //     bevy_input::InputPlugin,
-        //     bevy_app::TerminalCtrlCHandlerPlugin,
-        //     bevy_asset::AssetPlugin,
-        //     bevy_scene::ScenePlugin,
-        // );
-        // pub struct MinimalPlugins {
-        //     bevy_app:::TaskPoolPlugin,
-        //     bevy_diagnostic:::FrameCountPlugin,
-        //     bevy_time:::TimePlugin,
-        //     bevy_app:::ScheduleRunnerPlugin,
-        //     #[cfg(feature = "bevy_ci_testing")]
-        //     bevy_dev_tools::ci_testing:::CiTestingPlugin,
-        // }
-        //
         app.add_plugins((
-            //     bevy_asset::io::web::WebAssetPlugin,
             bevy::app::PanicHandlerPlugin::default(),
-            // bevy::app::TaskPoolPlugin::default(),
-            // bevy::diagnostic::FrameCountPlugin::default(),
-            // bevy::time::TimePlugin::default(),
             bevy::diagnostic::DiagnosticsPlugin::default(),
             bevy::input::InputPlugin::default(),
             bevy::app::TerminalCtrlCHandlerPlugin::default(),
-            bevy::log::LogPlugin::default(), // Чтобы видеть инфо в консоли
+            bevy::log::LogPlugin {
+                level: Level::INFO,
+                // filter: "wgpu=error,bevy_render=info,bevy_ecs=warn,bevy_time=warn,naga=warn,bevy_enhanced_input::action::fns=error".to_string(),
+                ..default()
+            }, // Чтобы видеть инфо в консоли
             bevy::transform::TransformPlugin, // Координаты (нужно для всего)
-            bevy::asset::AssetPlugin::default(), // Загрузка данных
-            bevy::scene::ScenePlugin,        // Работа со сценами (нужно для Avian)
-                                             // bevy::state::app::StatesPlugin,      // Стейты игры
+            bevy::asset::AssetPlugin {
+                meta_check: bevy::asset::AssetMetaCheck::Never,
+                ..default()
+            }, // Загрузка данных
+            bevy::scene::ScenePlugin,         // Работа со сценами (нужно для Avian)
+                                              // bevy::state::app::StatesPlugin,      // Стейты игры
         ));
-
-        // app.add_plugins(
-        // DefaultPlugins
-        //         .build()
-        //         // 1. Отключаем графическое ядро
-        //         .disable::<bevy::render::RenderPlugin>()
-        //         .disable::<bevy::render::pipelined_rendering::PipelinedRenderingPlugin>()
-        //         .disable::<bevy::core_pipeline::CorePipelinePlugin>()
-        //         // 2. Отключаем окна и ввод
-        //         .disable::<bevy::winit::WinitPlugin>()
-        //         .disable::<bevy::window::WindowPlugin>()
-        //         // 3. Отключаем высокоуровневую графику (шейдеры!)
-        //         // .disable::<bevy::pbr::PbrPlugin>()
-        //         .disable::<bevy::sprite::SpritePlugin>()
-        //         .disable::<bevy::ui::UiPlugin>()
-        //         .disable::<bevy::text::TextPlugin>()
-        //         .disable::<bevy::mesh::MeshPlugin>()
-        //         .disable::<bevy::image::ImagePlugin>()
-        //         // 4. Отключаем звук и прочее
-        //         // .disable::<bevy::audio::AudioPlugin>()
-        //         .disable::<bevy::gilrs::GilrsPlugin>()
-        //         .disable::<bevy::gizmos::GizmoPlugin>(),
-        // );
-
-        // ВАЖНО: Поскольку мы отключили WindowPlugin, нам нужно включить ScheduleRunnerPlugin,
-        // чтобы сервер работал в цикле, а не ждал событий окна.
-        // app.add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(
-        //     1.0 / 60.0,
-        // )));
-        // .set(WindowPlugin {
-        //     primary_window: Some(Window {
-        //         title: format!("Multiplayer: {}", env!("CARGO_PKG_NAME")),
-        //         resolution: (1024, 768).into(),
-        //         present_mode: PresentMode::AutoVsync,
-        //         prevent_default_event_handling: true,
-        //         ..default()
-        //     }),
-        //     ..default()
-        // });
-
-        // app.add_plugins(default_plugins);
         app.add_plugins(ServerPlugins {
             tick_duration: Duration::from_secs_f64(1.0 / FIXED_TIMESTEP_HZ),
         });
-        // NOTE: the ProtocolPlugin must be added AFTER the Client/Server plugins
         app.add_plugins(SharedPlugin);
         app.add_plugins(GameServerPlugin);
-        // app.add_plugins(GameRendererPlugin);
         app.run();
     }
 

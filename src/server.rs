@@ -22,6 +22,7 @@ use crate::{
 };
 use aeronet_websocket::server::ServerConfig;
 use avian2d::prelude::*;
+use bevy::log::tracing::instrument::WithSubscriber;
 use bevy::{
     color::palettes::css::{BLUE, RED},
     prelude::*,
@@ -136,7 +137,7 @@ fn on_player_connected(
     trigger: On<Add, Connected>,
     query: Query<&RemoteId, With<ClientOf>>,
     mut commands: Commands,
-    player_resources: Res<PlayerSpriteSheetResource>,
+    // player_resources: Res<PlayerSpriteSheetResource>,
     replicated_players: Query<
         (Entity, &InitialReplicated),
         (Added<InitialReplicated>, With<PlayerId>),
@@ -242,21 +243,13 @@ fn on_player_connected(
 pub fn start_server(mut commands: Commands) {
     info!("Server created");
 
-    // let sans = vec![
-    //     // SERVER_IP.to_string(),
-    //     "localhost".to_string(),
-    //     "127.0.0.1".to_string(),
-    //     "::1".to_string(),
-    // ];
+    // let identity =
+    //     aeronet_websocket::server::Identity::self_signed(["localhost", "127.0.0.1", "::1"])
+    //         .expect("all given SANs should be valid DNS names");
 
     let config = ServerConfig::builder()
-        .with_bind_address(SERVER_ADDR)
+        .with_bind_default(SERVER_PORT)
         .with_no_encryption();
-    // .with_identity(lightyear::websocket::server::Identity::self_signed(sans).unwrap());
-    // let config = ServerConfig::builder().;
-    // .with_bind_address(SERVER_ADDR)
-    // .with_no_encryption();
-    // .with_identity(lightyear::websocket::server::Identity::self_signed(sans).unwrap());
 
     let server = commands
         .spawn((
@@ -265,9 +258,7 @@ pub fn start_server(mut commands: Commands) {
                 private_key: SHARED_SETTINGS.private_key,
                 ..Default::default()
             }),
-            // pub const SERVER_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), SERVER_PORT);
             LocalAddr(SERVER_ADDR),
-            // ServerUdpIo::default(),
             WebSocketServerIo { config },
         ))
         .id();

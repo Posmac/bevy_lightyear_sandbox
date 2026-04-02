@@ -56,7 +56,7 @@ impl Plugin for GameClientPlugin {
         app.add_systems(PostUpdate, camera_follow);
         // app.add_systems(Update, debug_bullets_system);
         app.add_observer(handle_predicted_spawn);
-        app.add_observer(handle_interpolated_spawn);
+        // app.add_observer(handle_interpolated_spawn);
         app.add_observer(handle_world_config_spawn);
     }
 }
@@ -117,15 +117,27 @@ fn update_cursor_state_from_window(
 }
 
 pub fn startup(mut commands: Commands, config: Res<ClientId>) {
+    let random_id: u64 = rand::random();
     let auth = Authentication::Manual {
-        client_id: config.client_id,
+        client_id: random_id,
         server_addr: SERVER_ADDR,
         protocol_id: SHARED_SETTINGS.protocol_id,
         private_key: SHARED_SETTINGS.private_key,
     };
 
-    let server_url = "wss://droplets.it.com/ws";
-    let config = { ClientConfig::default() };
+    // let server_url = "ws://127.0.0.1:5888";
+    let server_url = "wss://vktjh6ln63sz.share.zrok.io";
+
+    let config = {
+        #[cfg(target_family = "wasm")]
+        {
+            ClientConfig
+        }
+        #[cfg(not(target_family = "wasm"))]
+        {
+            ClientConfig::builder().with_no_cert_validation()
+        }
+    };
 
     let client = commands
         .spawn((
@@ -150,7 +162,7 @@ pub fn startup(mut commands: Commands, config: Res<ClientId>) {
 fn handle_predicted_spawn(
     trigger: On<Add, (PlayerId, Predicted)>,
     mut commands: Commands,
-    player_resources: Res<PlayerSpriteSheetResource>,
+    // player_resources: Res<PlayerSpriteSheetResource>,
     mut query: Query<&PlayerMarker, With<Predicted>>,
 ) {
     let entity = trigger.entity;
@@ -182,19 +194,19 @@ fn handle_predicted_spawn(
         ));
 
         commands.entity(entity).with_children(|parent| {
-            parent.spawn((
-                Sprite::from_atlas_image(
-                    player_resources.player_image.clone(),
-                    TextureAtlas {
-                        layout: player_resources.atlas.clone(),
-                        index: 0,
-                    },
-                ),
-                Transform::from_scale(Vec3::splat(6.0)),
-                GlobalTransform::default(),
-                InheritedVisibility::default(),
-                PlayerAnimationTimer::new(2),
-            ));
+            // parent.spawn((
+            //     Sprite::from_atlas_image(
+            //         player_resources.player_image.clone(),
+            //         TextureAtlas {
+            //             layout: player_resources.atlas.clone(),
+            //             index: 0,
+            //         },
+            //     ),
+            //     Transform::from_scale(Vec3::splat(6.0)),
+            //     GlobalTransform::default(),
+            //     InheritedVisibility::default(),
+            //     PlayerAnimationTimer::new(2),
+            // ));
         });
     }
 }

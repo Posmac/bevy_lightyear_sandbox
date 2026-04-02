@@ -28,10 +28,8 @@ use crate::protocol::{
     PlayerState, PlayerStateEnum, ProtocolPlugin, StaticPhysicsBundle,
 };
 
-// pub const SERVER_IP: &str = "droplets.it.com";
 pub const FIXED_TIMESTEP_HZ: f64 = 64.0;
 pub const SERVER_PORT: u16 = 5888;
-/// 0 means that the OS will assign any available port
 pub const CLIENT_PORT: u16 = 0;
 pub const SERVER_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), SERVER_PORT);
 pub const LOCAL_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), CLIENT_PORT);
